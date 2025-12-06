@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: testcontainers-demo-test
+
+logging:
+  level:
+    root: INFO
+    com.example.testcontainers: DEBUG
+    org.testcontainers: INFO
