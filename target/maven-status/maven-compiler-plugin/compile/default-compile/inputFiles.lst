@@ -1,0 +1,11 @@
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/service/RedisService.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/controller/CacheController.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/service/KafkaProducerService.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/service/CassandraService.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/controller/KafkaController.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/TestcontainersApplication.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/model/User.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/repository/UserRepository.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/config/KafkaConfig.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/service/KafkaConsumerService.java
+/tmp/cc-agent/61174609/project/src/main/java/com/example/testcontainers/controller/CassandraController.java
