@@ -1,19 +1,13 @@
 package com.example.testcontainers;
 
-import com.example.testcontainers.config.TestcontainersConfig;
+import com.example.testcontainers.config.BaseIntegrationTest;
 import com.example.testcontainers.service.RedisService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-@Import(TestcontainersConfig.class)
-@ActiveProfiles("test")
-class RedisIntegrationTest {
+class RedisIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private RedisService redisService;

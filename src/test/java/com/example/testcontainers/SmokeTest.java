@@ -1,23 +1,17 @@
 package com.example.testcontainers;
 
-import com.example.testcontainers.config.TestcontainersConfig;
+import com.example.testcontainers.config.BaseIntegrationTest;
 import com.example.testcontainers.service.CassandraService;
 import com.example.testcontainers.service.KafkaProducerService;
 import com.example.testcontainers.service.RedisService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-@Import(TestcontainersConfig.class)
-@ActiveProfiles("test")
 @DisplayName("Smoke Test - Verify all services are operational")
-class SmokeTest {
+class SmokeTest extends BaseIntegrationTest {
 
     @Autowired
     private RedisService redisService;

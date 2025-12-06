@@ -1,7 +1,7 @@
 package com.example.testcontainers.config;
 
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.CassandraContainer;
@@ -9,12 +9,13 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
-@TestConfiguration
-public class TestcontainersConfig {
+@SpringBootTest
+@ActiveProfiles("test")
+public abstract class BaseIntegrationTest {
 
-    private static final GenericContainer<?> redisContainer;
-    private static final KafkaContainer kafkaContainer;
-    private static final CassandraContainer<?> cassandraContainer;
+    protected static final GenericContainer<?> redisContainer;
+    protected static final KafkaContainer kafkaContainer;
+    protected static final CassandraContainer<?> cassandraContainer;
 
     static {
         redisContainer = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
@@ -43,20 +44,5 @@ public class TestcontainersConfig {
         registry.add("spring.cassandra.local-datacenter", () -> "datacenter1");
         registry.add("spring.cassandra.keyspace-name", () -> "test_keyspace");
         registry.add("spring.cassandra.schema-action", () -> "create_if_not_exists");
-    }
-
-    @Bean
-    public GenericContainer<?> redisContainer() {
-        return redisContainer;
-    }
-
-    @Bean
-    public KafkaContainer kafkaContainer() {
-        return kafkaContainer;
-    }
-
-    @Bean
-    public CassandraContainer<?> cassandraContainer() {
-        return cassandraContainer;
     }
 }

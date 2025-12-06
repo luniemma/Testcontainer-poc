@@ -1,14 +1,11 @@
 package com.example.testcontainers;
 
-import com.example.testcontainers.config.TestcontainersConfig;
+import com.example.testcontainers.config.BaseIntegrationTest;
 import com.example.testcontainers.service.KafkaConsumerService;
 import com.example.testcontainers.service.KafkaProducerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -16,10 +13,7 @@ import java.util.concurrent.TimeUnit;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-@Import(TestcontainersConfig.class)
-@ActiveProfiles("test")
-class KafkaIntegrationTest {
+class KafkaIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private KafkaProducerService producerService;
