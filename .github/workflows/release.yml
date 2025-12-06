@@ -10,11 +10,11 @@ jobs:
     uses: ./.github/workflows/ci-cd.yml
     with:
       java-version: '17'
-      docker-registry: 'ghcr.io'
       docker-platforms: 'linux/amd64,linux/arm64'
       enable-security-scan: true
       run-tests: true
       sonar-token: ${{ secrets.SONAR_TOKEN }}
+      event-name: ${{ github.event_name }}
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

@@ -17,7 +17,7 @@ on:
         description: 'Docker registry to push images'
         required: false
         type: string
-        default: 'ghcr.io'
+        default: 'docker.io'
       docker-platforms:
         description: 'Target platforms for Docker build'
         required: false
@@ -28,6 +28,10 @@ on:
         required: false
         type: string
         default: ''
+      event-name:
+        description: 'Upstream GitHub event name when called from another workflow'
+        required: false
+        type: string
       enable-security-scan:
         description: 'Enable security scanning'
         required: false
@@ -60,7 +64,7 @@ on:
       - develop
 
 env:
-  REGISTRY: ghcr.io
+  REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
@@ -135,7 +139,7 @@ jobs:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name != 'pull_request'
+    if: ${{ (inputs['event-name'] || github.event_name) != 'pull_request' }}
     permissions:
       contents: read
       packages: write
@@ -264,7 +268,7 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [docker, security]
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/develop' && (inputs['event-name'] || github.event_name) == 'push'
     environment:
       name: staging
       url: https://staging.example.com
