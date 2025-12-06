@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: 'linux/amd64,linux/arm64'
+      sonar-token:
+        description: 'Token for SonarCloud analysis'
+        required: false
+        type: string
+        default: ''
       enable-security-scan:
         description: 'Enable security scanning'
         required: false
@@ -37,8 +42,6 @@ on:
       DOCKER_USERNAME:
         required: false
       DOCKER_PASSWORD:
-        required: false
-      SONAR_TOKEN:
         required: false
     outputs:
       image-tag:
@@ -111,10 +114,10 @@ jobs:
           fail_ci_if_error: false
 
       - name: SonarCloud Scan
-        if: ${{ secrets.SONAR_TOKEN != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ inputs.sonar-token || '' }}
+        if: ${{ inputs.sonar-token != '' }}
         run: |
           mvn -B sonar:sonar \
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
