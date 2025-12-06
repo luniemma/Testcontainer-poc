@@ -113,15 +113,15 @@ jobs:
           files: ./target/site/jacoco/jacoco.xml
           fail_ci_if_error: false
 
-        - name: SonarCloud Scan
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            SONAR_TOKEN: ${{ inputs.sonar-token || '' }}
-          if: ${{ inputs.sonar-token != '' }}
-          run: |
-            mvn -B sonar:sonar \
-              -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
-              -Dsonar.organization=${{ github.repository_owner }} \
+      - name: SonarCloud Scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ inputs.sonar-token || '' }}
+        if: ${{ inputs.sonar-token != '' }}
+        run: |
+          mvn -B sonar:sonar \
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
+            -Dsonar.organization=${{ github.repository_owner }} \
             -Dsonar.host.url=https://sonarcloud.io
 
       - name: Upload build artifact
