@@ -1,0 +1,5 @@
+com/example/testcontainers/config/BaseIntegrationTest.class
+com/example/testcontainers/CassandraIntegrationTest.class
+com/example/testcontainers/KafkaIntegrationTest.class
+com/example/testcontainers/RedisIntegrationTest.class
+com/example/testcontainers/SmokeTest.class
