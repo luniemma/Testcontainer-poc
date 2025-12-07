@@ -122,8 +122,8 @@ jobs:
       - name: SonarCloud Scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ inputs.sonar-token || secrets.SONAR_TOKEN || '' }}
-        if: ${{ (inputs.sonar-token || secrets.SONAR_TOKEN) != '' }}
+          SONAR_TOKEN: ${{ inputs['sonar-token'] || secrets.SONAR_TOKEN || '' }}
+        if: ${{ (inputs['sonar-token'] || secrets.SONAR_TOKEN) != '' }}
         run: |
           mvn -B sonar:sonar \
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
