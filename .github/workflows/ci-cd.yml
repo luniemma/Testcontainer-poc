@@ -47,6 +47,8 @@ on:
         required: false
       DOCKER_PASSWORD:
         required: false
+      SONAR_TOKEN:
+        required: false
     outputs:
       image-tag:
         description: 'The Docker image tag that was built'
