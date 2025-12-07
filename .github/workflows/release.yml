@@ -13,9 +13,9 @@ jobs:
       docker-platforms: "linux/amd64,linux/arm64"
       run-tests: true
       enable-security-scan: true
-      sonar-token: ${{ secrets.SONAR_TOKEN }}     # ✅ valid usage
-      event-name: ${{ github.event_name }}        # safe
+      sonar-token: ""                    # 🔥 NEVER put secrets here
+      event-name: ${{ github.event_name }}
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}     # MUST BE PASSED FOR workflow_call
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
