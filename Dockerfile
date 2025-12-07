@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Spring Boot Application
-# Stage 1: Build the application
-FROM maven:3.9.6-eclipse-temurin-17-alpine AS builder
+# Stage 1: Build the application (multi-arch friendly base)
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
 
 # Set working directory
 WORKDIR /build
@@ -19,8 +19,8 @@ COPY src ./src
 # Tests are run in CI/CD pipeline
 RUN mvn clean package -DskipTests -B
 
-# Stage 2: Create the runtime image
-FROM eclipse-temurin:17-jre-alpine AS runtime
+# Stage 2: Create the runtime image (multi-arch friendly base)
+FROM eclipse-temurin:17-jre AS runtime
 
 # Add metadata labels
 LABEL maintainer="your-team@example.com"
@@ -28,8 +28,10 @@ LABEL org.opencontainers.image.source="https://github.com/your-org/testcontainer
 LABEL org.opencontainers.image.description="Spring Boot Testcontainers Demo Application"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and utilities for proper signal handling and health checks
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init wget ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S appgroup && \

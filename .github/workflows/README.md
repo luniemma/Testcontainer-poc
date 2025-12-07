@@ -22,6 +22,8 @@ Triggers on:
 
 Uses the reusable `ci-cd.yml` workflow.
 
+Passes through the triggering GitHub event name so reusable-job conditions (like deployments) behave the same way as native runs.
+
 ### 3. `release.yml` - Release Pipeline
 
 Triggers on:
@@ -38,18 +40,29 @@ Creates production releases with full security scanning.
 3. Ensure "Allow all actions and reusable workflows" is selected
 4. Save changes
 
-### 2. Configure GitHub Container Registry
+### 2. Configure Docker Registry (Docker Hub by default)
 
-The workflows push Docker images to GitHub Container Registry (ghcr.io).
+The workflows build and push Docker images to a Docker registry. By default, they target Docker Hub (`docker.io`).
 
-**Enable GHCR:**
+**Set up access for Docker Hub:**
 
-1. Go to your profile Settings
-2. Navigate to Packages
-3. Click "Connect repository" for your package
-4. Select visibility (public/private)
+1. Create a Docker Hub account and namespace.
+2. Add repository-scoped credentials in Docker Hub (recommended: access tokens).
+3. In GitHub, go to Settings → Secrets and variables → Actions and add:
+   - `DOCKER_USERNAME`: Your Docker Hub username or namespace.
+   - `DOCKER_PASSWORD`: Your Docker Hub password or access token.
 
-**No additional secrets needed** - workflows use `GITHUB_TOKEN` automatically.
+**Use a different registry:**
+
+Pass the registry host through the `docker-registry` input in your calling workflow:
+
+```yaml
+with:
+  docker-registry: 'registry.example.com'
+secrets:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+```
 
 ### 3. Optional: Configure Secrets
 
@@ -60,13 +73,6 @@ Add these secrets in Settings → Secrets and variables → Actions:
 - `SONAR_TOKEN`: Your SonarCloud token
   - Get from: https://sonarcloud.io/account/security
   - Update `pom.xml` with your organization and project key
-
-#### Required for Custom Registry (Optional)
-
-If not using GHCR:
-
-- `DOCKER_USERNAME`: Registry username
-- `DOCKER_PASSWORD`: Registry password or token
 
 ### 4. Configure Branch Protection
 
@@ -162,17 +168,17 @@ Images are tagged automatically:
 | Tag `v1.2.3` | `v1.2.3`, `1.2`, `1`, `latest` |
 | Pull Request | `pr-<number>` |
 
-**Pull an image:**
+**Pull an image from Docker Hub (default):**
 
 ```bash
 # Latest from main
-docker pull ghcr.io/your-org/testcontainers-demo:latest
+docker pull docker.io/your-org/testcontainers-demo:latest
 
 # Specific version
-docker pull ghcr.io/your-org/testcontainers-demo:v1.0.0
+docker pull docker.io/your-org/testcontainers-demo:v1.0.0
 
 # Specific commit
-docker pull ghcr.io/your-org/testcontainers-demo:main-abc1234
+docker pull docker.io/your-org/testcontainers-demo:main-abc1234
 ```
 
 ## Customizing Workflows
@@ -218,8 +224,8 @@ Use a different registry:
 with:
   docker-registry: 'docker.io'
 secrets:
-  DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 ```
 
 ## Workflow Stages Explained
@@ -389,7 +395,7 @@ gh run download <run-id>
 **Re-authenticate:**
 
 ```bash
-echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+echo $DOCKER_PASSWORD | docker login docker.io -u $DOCKER_USERNAME --password-stdin
 ```
 
 ## Performance Optimization
