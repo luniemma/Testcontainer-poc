@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: 'linux/amd64,linux/arm64'
+      sonar-token:
+        description: 'Token for SonarCloud analysis'
+        required: false
+        type: string
+        default: ''
       event-name:
         description: 'Upstream GitHub event name when called from another workflow'
         required: false
@@ -50,15 +55,11 @@ on:
         value: ${{ jobs.build.outputs.image-tag }}
 
   push:
-    branches:
-      - main
-      - develop
-    tags:
-      - 'v*.*.*'
+    branches: [main, develop]
+    tags: ['v*.*.*']
+
   pull_request:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
 
 env:
   REGISTRY: docker.io
@@ -72,24 +73,22 @@ jobs:
       contents: read
       packages: write
       security-events: write
+
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          java-version: ${{ inputs.java-version || '17' }}
+          java-version: ${{ inputs.java-version }}
           distribution: 'temurin'
-          cache: 'maven'
+          cache: maven
 
-      - name: Cache Maven packages
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -100,118 +99,105 @@ jobs:
         run: mvn -B clean package -DskipTests
 
       - name: Run tests
-        if: ${{ inputs.run-tests != false }}
+        if: ${{ inputs.run-tests }}
         run: mvn -B test
 
       - name: Generate test coverage report
-        if: ${{ inputs.run-tests != false }}
+        if: ${{ inputs.run-tests }}
         run: mvn -B jacoco:report
 
       - name: Upload coverage to Codecov
-        if: ${{ inputs.run-tests != false && github.event_name == 'push' }}
+        if: ${{ inputs.run-tests && github.event_name == 'push' }}
         uses: codecov/codecov-action@v4
         with:
           files: ./target/site/jacoco/jacoco.xml
           fail_ci_if_error: false
 
       - name: SonarCloud Scan
+        if: ${{ inputs.sonar-token != '' || secrets.SONAR_TOKEN != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN || '' }}
-        if: ${{ secrets.SONAR_TOKEN != '' }}
+          SONAR_TOKEN: ${{ inputs.sonar-token != '' && inputs.sonar-token || secrets.SONAR_TOKEN }}
         run: |
           mvn -B sonar:sonar \
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
             -Dsonar.organization=${{ github.repository_owner }} \
             -Dsonar.host.url=https://sonarcloud.io
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: application-jar
           path: target/*.jar
           retention-days: 7
 
   docker:
-    name: Build and Push Docker Image
+    name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: build
-    if: ${{ (inputs['event-name'] || github.event_name) != 'pull_request' }}
+    if: ${{ (inputs.event-name || github.event_name) != 'pull_request' }}
     permissions:
       contents: read
       packages: write
       security-events: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
+      - name: Log in to Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ inputs.docker-registry || env.REGISTRY }}
+          registry: ${{ inputs.docker-registry }}
           username: ${{ secrets.DOCKER_USERNAME || github.actor }}
           password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract Docker Metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.docker-registry || env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ inputs.docker-registry }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{ inputs.docker-platforms || 'linux/amd64,linux/arm64' }}
+          platforms: ${{ inputs.docker-platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.meta.outputs.version }}
 
-      - name: Run Trivy vulnerability scanner
-        if: ${{ inputs.enable-security-scan != false }}
+      - name: Run Trivy Scan
+        if: ${{ inputs.enable-security-scan }}
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ inputs.docker-registry || env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          image-ref: ${{ inputs.docker-registry }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
 
-      - name: Upload Trivy results to GitHub Security
-        if: ${{ inputs.enable-security-scan != false }}
+      - name: Upload SARIF to GitHub Security
+        if: ${{ inputs.enable-security-scan }}
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: trivy-results.sarif
 
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ inputs.docker-registry || env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          image: ${{ inputs.docker-registry }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
           format: spdx-json
           output-file: sbom.spdx.json
 
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: sbom.spdx.json
@@ -220,21 +206,19 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    if: ${{ inputs.enable-security-scan != false }}
+    if: ${{ inputs.enable-security-scan }}
     permissions:
       contents: read
       security-events: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          java-version: ${{ inputs.java-version || '17' }}
+          java-version: ${{ inputs.java-version }}
           distribution: 'temurin'
-          cache: 'maven'
+          cache: maven
 
       - name: Run OWASP Dependency Check
         run: |
@@ -242,9 +226,8 @@ jobs:
             -DfailBuildOnCVSS=7 \
             -DsuppressionFiles=dependency-check-suppressions.xml
 
-      - name: Upload dependency check report
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
           path: target/dependency-check-report.html
@@ -265,17 +248,13 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [docker, security]
-    if: github.ref == 'refs/heads/develop' && (inputs['event-name'] || github.event_name) == 'push'
+    if: github.ref == 'refs/heads/develop' && (inputs.event-name || github.event_name) == 'push'
     environment:
       name: staging
       url: https://staging.example.com
 
     steps:
-      - name: Deploy to staging environment
-        run: |
-          echo "Deploying to staging..."
-          # Add your deployment commands here
-          # Example: kubectl set image deployment/app app=${{ needs.build.outputs.image-tag }}
+      - run: echo "Deploy staging …"
 
   deploy-production:
     name: Deploy to Production
@@ -287,15 +266,9 @@ jobs:
       url: https://production.example.com
 
     steps:
-      - name: Deploy to production environment
-        run: |
-          echo "Deploying to production..."
-          # Add your production deployment commands here
-          # Example: kubectl set image deployment/app app=${{ needs.build.outputs.image-tag }}
+      - run: echo "Deploy production …"
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
-          files: |
-            sbom.spdx.json
+          files: sbom.spdx.json
