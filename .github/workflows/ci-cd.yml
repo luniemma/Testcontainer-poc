@@ -47,6 +47,8 @@ on:
         required: false
       DOCKER_PASSWORD:
         required: false
+      SONAR_TOKEN:
+        required: false
     outputs:
       image-tag:
         description: 'The Docker image tag that was built'
@@ -75,6 +77,8 @@ jobs:
       contents: read
       packages: write
       security-events: write
+    env:
+      SONAR_TOKEN: ${{ inputs['sonar-token'] != '' && inputs['sonar-token'] || secrets.SONAR_TOKEN || '' }}
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
 
@@ -120,8 +124,8 @@ jobs:
       - name: SonarCloud Scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ inputs['sonar-token'] || secrets.SONAR_TOKEN || '' }}
-        if: ${{ (inputs['sonar-token'] || secrets.SONAR_TOKEN) != '' }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         run: |
           mvn -B sonar:sonar \
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
