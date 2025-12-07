@@ -5,18 +5,13 @@ FROM maven:3.9.6-eclipse-temurin-17 AS builder
 # Set working directory
 WORKDIR /build
 
-# Copy Maven configuration files first (for better layer caching)
+# Copy Maven configuration and source files
 COPY pom.xml .
-COPY .mvn .mvn
-
-# Download dependencies (cached layer if pom.xml doesn't change)
-RUN mvn dependency:go-offline -B
-
-# Copy source code
 COPY src ./src
 
-# Build the application (skip tests in Docker build for faster builds)
-# Tests are run in CI/CD pipeline
+# Build the application
+# Maven will download dependencies as needed during build
+# Tests are skipped in Docker build for faster builds - they run in CI/CD pipeline
 RUN mvn clean package -DskipTests -B
 
 # Stage 2: Create the runtime image (multi-arch friendly base)
@@ -34,8 +29,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+RUN groupadd --gid 1001 appgroup && \
+    useradd --uid 1001 --gid appgroup --shell /bin/bash --create-home appuser
 
 # Set working directory
 WORKDIR /app
