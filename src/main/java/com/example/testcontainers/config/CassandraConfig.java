@@ -46,9 +46,4 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
     public SchemaAction getSchemaAction() {
         return SchemaAction.CREATE_IF_NOT_EXISTS;
     }
-
-    @Override
-    protected boolean getMetricsEnabled() {
-        return false;
-    }
 }
