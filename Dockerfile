@@ -7,7 +7,6 @@ WORKDIR /build
 
 # Copy Maven configuration files first (for better layer caching)
 COPY pom.xml .
-COPY .mvn .mvn
 
 # Download dependencies (cached layer if pom.xml doesn't change)
 RUN mvn dependency:go-offline -B
