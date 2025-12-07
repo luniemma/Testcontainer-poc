@@ -1,31 +1,25 @@
-name: CI/CD Pipeline
+name: Reusable CI/CD Pipeline
 
 on:
   workflow_call:
     inputs:
       java-version:
         type: string
-        default: '17'
-      maven-version:
-        type: string
-        default: '3.9.6'
-      docker-registry:
-        type: string
-        default: 'docker.io'
+        default: "17"
       docker-platforms:
         type: string
-        default: 'linux/amd64,linux/arm64'
+        default: "linux/amd64,linux/arm64"
       sonar-token:
         type: string
-        default: ''
-      event-name:
-        type: string
+        default: ""
       enable-security-scan:
         type: boolean
         default: true
       run-tests:
         type: boolean
         default: true
+      event-name:
+        type: string
     secrets:
       DOCKER_USERNAME:
         required: false
@@ -37,13 +31,6 @@ on:
       image-tag:
         value: ${{ jobs.build.outputs.image-tag }}
 
-  push:
-    branches: [main, develop]
-    tags: ["v*.*.*"]
-
-  pull_request:
-    branches: [main, develop]
-
 env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository }}
@@ -52,50 +39,25 @@ jobs:
   build:
     name: Build & Unit Tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: ${{ inputs.java-version }}
           distribution: temurin
           cache: maven
 
-      - name: Cache Maven
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
-
-      - name: Build (skip tests)
-        run: mvn -B clean package -DskipTests
+      - run: mvn -B clean package -DskipTests
 
       - name: Run Unit Tests
         if: ${{ inputs.run-tests }}
         run: mvn -B test
 
-      - name: Generate Coverage
-        if: ${{ inputs.run-tests }}
-        run: mvn -B jacoco:report
-
-      - name: Upload Codecov
-        if: ${{ inputs.run-tests && github.event_name == 'push' }}
-        uses: codecov/codecov-action@v4
-        with:
-          files: target/site/jacoco/jacoco.xml
-          fail_ci_if_error: false
-
-      - name: Set Sonar Token Environment
+      - name: Set SONAR_TOKEN_SAFE
         env:
           TOKEN: ${{ inputs.sonar-token }}
         run: echo "SONAR_TOKEN_SAFE=$TOKEN" >> $GITHUB_ENV
@@ -107,17 +69,7 @@ jobs:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN_SAFE }}
         run: |
           mvn -B sonar:sonar \
-            -Dsonar.login=${{ env.SONAR_TOKEN }} \
-            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
-            -Dsonar.organization=${{ github.repository_owner }} \
-            -Dsonar.host.url=https://sonarcloud.io
-
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-jar
-          path: target/*.jar
-          retention-days: 7
+            -Dsonar.login=${{ env.SONAR_TOKEN }}
 
   testcontainers:
     name: Testcontainers Integration Tests
@@ -126,52 +78,32 @@ jobs:
     if: ${{ inputs.run-tests }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: ${{ inputs.java-version }}
           distribution: temurin
           cache: maven
 
-      - name: Start Docker (required for Testcontainers)
-        run: sudo systemctl start docker
+      - run: sudo systemctl start docker
 
-      - name: Run Testcontainers Integration Tests
-        run: mvn -B -Ptestcontainers verify
-
-      - name: Upload Testcontainers Reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: testcontainers-reports
-          path: |
-            target/surefire-reports/**
-            target/failsafe-reports/**
-          retention-days: 14
+      - run: mvn -B -Ptestcontainers verify
 
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: [build, testcontainers]
-    if: ${{ (inputs.event-name || github.event_name) != 'pull_request' }}
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
+    if: ${{ inputs.event-name != 'pull_request' }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
-      - name: Login to Registry
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
-          registry: ${{ inputs.docker-registry }}
+          registry: docker.io
           username: ${{ secrets.DOCKER_USERNAME || github.actor }}
           password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
 
@@ -179,29 +111,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.docker-registry }}/${{ env.IMAGE_NAME }}
+          images: docker.io/${{ env.IMAGE_NAME }}
 
-      - name: Build & Push
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           platforms: ${{ inputs.docker-platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          image: ${{ steps.meta.outputs.tags }}
-          format: spdx-json
-          output-file: sbom.spdx.json
-
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.spdx.json
 
   security:
     name: Security Scan
@@ -210,28 +127,17 @@ jobs:
     if: ${{ inputs.enable-security-scan }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: OWASP DepCheck
+      - name: Dependency Check
         run: mvn -B org.owasp:dependency-check-maven:check
 
-      - name: Upload DepCheck Report
-        uses: actions/upload-artifact@v4
+      - uses: github/codeql-action/init@v3
         with:
-          name: dependency-check-report
-          path: target/dependency-check-report.html
+          languages: 'java'
 
-      - name: Init CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java
-
-      - name: Build for CodeQL
-        run: mvn -B clean package -DskipTests
-
-      - name: CodeQL Analyze
-        uses: github/codeql-action/analyze@v3
+      - run: mvn -B clean package -DskipTests
+      - uses: github/codeql-action/analyze@v3
 
   deploy-production:
     name: Deploy to Production
@@ -240,11 +146,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      - name: Deploy Production
-        run: echo "Deploying to PRODUCTION…"
+      - run: echo "Deploying to Production..."
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
-          files: sbom.spdx.json

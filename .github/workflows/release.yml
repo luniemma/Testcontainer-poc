@@ -9,10 +9,10 @@ jobs:
   release:
     uses: ./.github/workflows/ci-cd.yml
     with:
-      java-version: "17"                      # REQUIRED
+      java-version: "17"
       docker-platforms: "linux/amd64,linux/arm64"
-      enable-security-scan: true
       run-tests: true
+      enable-security-scan: true
       sonar-token: ${{ secrets.SONAR_TOKEN }}
       event-name: ${{ github.event_name }}
     secrets:

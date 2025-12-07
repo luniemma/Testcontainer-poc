@@ -5,16 +5,15 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
-  workflow_dispatch:
 
 jobs:
   build:
     uses: ./.github/workflows/ci-cd.yml
     with:
-      java-version: "17"                    # MUST be a string
+      java-version: "17"
       docker-platforms: "linux/amd64,linux/arm64"
-      enable-security-scan: true
       run-tests: true
+      enable-security-scan: true
       sonar-token: ${{ secrets.SONAR_TOKEN }}
       event-name: ${{ github.event_name }}
     secrets:
