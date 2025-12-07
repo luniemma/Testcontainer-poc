@@ -37,7 +37,8 @@ public abstract class BaseIntegrationTest {
 
         if (cassandraContainer == null) {
             cassandraContainer = new CassandraContainer<>(DockerImageName.parse("cassandra:4.1"))
-                    .withReuse(true);
+                    .withReuse(true)
+                    .withInitScript("cassandra-init.cql");
             cassandraContainer.start();
         }
     }
