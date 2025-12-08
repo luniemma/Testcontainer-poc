@@ -96,6 +96,7 @@ jobs:
         run: |
           mvn -B sonar:sonar \
             -Dsonar.login=${{ env.SONAR_TOKEN }}
+            -Dsonar.java.a3s.enable=false
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
