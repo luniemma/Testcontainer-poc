@@ -95,7 +95,7 @@ jobs:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN_SAFE }}
         run: |
           mvn -B sonar:sonar \
-            -Dsonar.login=${{ env.SONAR_TOKEN }} \
+            -Dsonar.login=${{ env.SONAR_TOKEN }}
             -Dsonar.java.a3s.enable=false
 
       - name: Upload JAR
