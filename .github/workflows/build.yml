@@ -5,12 +5,16 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
+    permissions:
+      contents: read
+      security-events: write
     uses: ./.github/workflows/ci-cd.yml
     with:
       java-version: "17"
