@@ -38,6 +38,11 @@ on:
       image-tag:
         value: ${{ jobs.build.outputs.image-tag }}
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
 env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository }}
@@ -189,6 +194,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker
     if: ${{ inputs.enable-security-scan }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     steps:
       - uses: actions/checkout@v4
