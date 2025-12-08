@@ -238,14 +238,15 @@ jobs:
         run: mvn -B -Dtest=EnhancedSmokeTest test
 
 
-  #######################################
-  # SECURITY SCANNERS (OWASP + CODEQL)
-  #######################################
+    #######################################
+    # SECURITY SCANNERS (OWASP + CODEQL)
+    #######################################
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: [docker, smoke-tests]
-    needs: docker
+    needs:
+      - docker
+      - smoke-tests
     if: ${{ inputs.enable-security-scan && inputs.event-name != 'pull_request' }}
     permissions:
       contents: read
