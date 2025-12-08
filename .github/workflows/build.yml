@@ -24,3 +24,4 @@ jobs:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   # 🔥 ONLY this is allowed
+      TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
