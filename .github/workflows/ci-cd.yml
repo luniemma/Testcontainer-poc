@@ -165,6 +165,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: docker.io/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha
 
       - uses: docker/build-push-action@v5
         with:
@@ -228,6 +230,10 @@ jobs:
         env:
           IMAGE_TAGS: ${{ needs.docker.outputs.image-tag }}
         run: |
+          if [ -z "$IMAGE_TAGS" ]; then
+            echo "No image tags were produced by the docker job" >&2
+            exit 1
+          fi
           IMAGE_TAG=$(echo "$IMAGE_TAGS" | head -n 1)
           echo "Pulling image: $IMAGE_TAG"
           docker pull "$IMAGE_TAG"
