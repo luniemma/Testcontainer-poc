@@ -40,7 +40,7 @@ Creates production releases with full security scanning.
 3. Ensure "Allow all actions and reusable workflows" is selected
 4. Save changes
 
-### 2. Configure Docker Registry (Docker Hub by default)
+### 2. Configure Docker Registry (Docker Hub by default )
 
 The workflows build and push Docker images to a Docker registry. By default, they target Docker Hub (`docker.io`).
 
