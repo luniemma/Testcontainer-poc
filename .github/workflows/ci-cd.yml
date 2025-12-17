@@ -38,7 +38,7 @@ on:
 
     outputs:
       image-tag:
-        value: ${{ jobs.build.outputs.image-tag }}
+        value: ${{ jobs.docker.outputs['image-tag'] }}
 
 permissions:
   contents: read
@@ -167,6 +167,7 @@ jobs:
           images: docker.io/${{ env.IMAGE_NAME }}
           tags: |
             type=sha
+            type=raw,value=latest
 
       - uses: docker/build-push-action@v5
         with:
@@ -228,7 +229,7 @@ jobs:
 
       - name: Pull published image
         env:
-          IMAGE_TAGS: ${{ needs.docker.outputs.image-tag }}
+          IMAGE_TAGS: ${{ needs.docker.outputs['image-tag'] }}
         run: |
           if [ -z "$IMAGE_TAGS" ]; then
             echo "No image tags were produced by the docker job" >&2
