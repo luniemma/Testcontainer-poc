@@ -119,7 +119,7 @@ git push origin v1.0.0
 ```
 
 The release workflow will:
-1. Run full test suite
+1. Run full tests suite 
 2. Perform security scans
 3. Build multi-platform Docker images
 4. Generate SBOM
