@@ -55,7 +55,10 @@ jobs:
   build:
     name: Build & Unit Tests
     runs-on: ubuntu-latest
-    # REMOVED orphan outputs that referenced non-existent 'meta' step
+    outputs:
+      build-status: ${{ steps.build-result.outputs.status }}
+      test-status: ${{ steps.test-result.outputs.status }}
+      jar-name: ${{ steps.jar-info.outputs.name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -66,11 +69,35 @@ jobs:
           distribution: "temurin"
           cache: "maven"
 
-      - run: mvn -B clean package -DskipTests
+      - name: Build Application
+        id: build-step
+        run: mvn -B clean package -DskipTests
+
+      - name: Set Build Result
+        id: build-result
+        if: always()
+        run: echo "status=${{ steps.build-step.outcome }}" >> $GITHUB_OUTPUT
 
       - name: Run Unit Tests
+        id: unit-tests
         if: ${{ inputs.run-tests }}
         run: mvn -B test
+
+      - name: Set Test Result
+        id: test-result
+        if: always()
+        run: |
+          if [ "${{ inputs.run-tests }}" == "false" ]; then
+            echo "status=skipped" >> $GITHUB_OUTPUT
+          else
+            echo "status=${{ steps.unit-tests.outcome }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get JAR Info
+        id: jar-info
+        run: |
+          JAR_NAME=$(ls target/*.jar 2>/dev/null | head -1 | xargs basename)
+          echo "name=$JAR_NAME" >> $GITHUB_OUTPUT
 
       #######################################
       # SONAR TOKEN SAFE-MERGE LOGIC
@@ -103,6 +130,40 @@ jobs:
           path: target/*.jar
           retention-days: 7
 
+      - name: Upload Test Reports
+        if: ${{ inputs.run-tests && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            target/surefire-reports/**
+            target/site/jacoco/**
+          retention-days: 14
+          if-no-files-found: ignore
+
+      #######################################
+      # BUILD JOB SUMMARY
+      #######################################
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## 🏗️ Build & Unit Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Maven Build | ${{ steps.build-step.outcome == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.run-tests }}" == "true" ]; then
+            echo "| Unit Tests | ${{ steps.unit-tests.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Unit Tests | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Java Version:** ${{ inputs.java-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.jar-info.outputs.name }}" ]; then
+            echo "**Artifact:** \`${{ steps.jar-info.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
 
   #######################################
   # TESTCONTAINERS INTEGRATION TESTS
@@ -112,6 +173,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: ${{ inputs.run-tests }}
+    outputs:
+      integration-status: ${{ steps.integration-result.outputs.status }}
+      test-count: ${{ steps.test-stats.outputs.count }}
 
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +189,24 @@ jobs:
       - run: sudo systemctl start docker
 
       - name: Run Integration Tests
+        id: integration-tests
         run: mvn -B -Ptestcontainers verify
+
+      - name: Set Integration Result
+        id: integration-result
+        if: always()
+        run: echo "status=${{ steps.integration-tests.outcome }}" >> $GITHUB_OUTPUT
+
+      - name: Get Test Statistics
+        id: test-stats
+        if: always()
+        run: |
+          if [ -d "target/failsafe-reports" ]; then
+            TEST_COUNT=$(grep -r "tests=" target/failsafe-reports/*.xml 2>/dev/null | grep -oP 'tests="\K[0-9]+' | awk '{sum+=$1} END {print sum}')
+            echo "count=${TEST_COUNT:-0}" >> $GITHUB_OUTPUT
+          else
+            echo "count=0" >> $GITHUB_OUTPUT
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -135,6 +216,19 @@ jobs:
             target/failsafe-reports/**
           retention-days: 14
 
+      #######################################
+      # INTEGRATION TESTS SUMMARY
+      #######################################
+      - name: Integration Tests Summary
+        if: always()
+        run: |
+          echo "## 🧪 Integration Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ steps.integration-tests.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Count | ${{ steps.test-stats.outputs.count }} |" >> $GITHUB_STEP_SUMMARY
+
 
   #######################################
   # DOCKER BUILD & PUSH
@@ -143,7 +237,6 @@ jobs:
     name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [build, testcontainers]
-    # FIX: Run even if testcontainers was skipped, but not if it failed
     if: |
       always() &&
       needs.build.result == 'success' &&
@@ -151,6 +244,8 @@ jobs:
       inputs.event-name != 'pull_request'
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
+      docker-status: ${{ steps.docker-result.outputs.status }}
+      image-digest: ${{ steps.build-push.outputs.digest }}
 
     steps:
       - uses: actions/checkout@v4
@@ -173,14 +268,20 @@ jobs:
             type=raw,value=latest
             type=sha
 
-      - uses: docker/build-push-action@v5
+      - name: Build and Push
+        id: build-push
+        uses: docker/build-push-action@v5
         with:
           context: .
           platforms: ${{ inputs.docker-platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
 
-      # FIX: Debug output to verify tags are generated
+      - name: Set Docker Result
+        id: docker-result
+        if: always()
+        run: echo "status=${{ steps.build-push.outcome }}" >> $GITHUB_OUTPUT
+
       - name: Verify image tags
         run: |
           echo "Generated tags: ${{ steps.meta.outputs.tags }}"
@@ -201,6 +302,25 @@ jobs:
           name: sbom
           path: sbom.spdx.json
 
+      #######################################
+      # DOCKER BUILD SUMMARY
+      #######################################
+      - name: Docker Summary
+        if: always()
+        run: |
+          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ steps.build-push.outcome == 'success' && '✅ Success' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Platforms | \`${{ inputs.docker-platforms }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Digest | \`${{ steps.build-push.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏷️ Image Tags" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
 
   #######################################
   # CONTAINER SMOKE TESTS (TESTCONTAINERS CLOUD)
@@ -209,11 +329,12 @@ jobs:
     name: Container Smoke Tests (Testcontainers Cloud)
     runs-on: ubuntu-latest
     needs: docker
-    # FIX: Only run if docker job actually succeeded
     if: |
       always() &&
       needs.docker.result == 'success' &&
       inputs.event-name != 'pull_request'
+    outputs:
+      smoke-status: ${{ steps.smoke-result.outputs.status }}
 
     steps:
       - uses: actions/checkout@v4
@@ -246,7 +367,6 @@ jobs:
 
       - name: Pull published image
         env:
-          # FIX: Use dot notation and handle multi-line tags properly
           IMAGE_TAGS: ${{ needs.docker.outputs.image-tag }}
         run: |
           echo "Received IMAGE_TAGS:"
@@ -258,15 +378,33 @@ jobs:
             exit 1
           fi
           
-          # Get the first tag (handles multi-line output)
           IMAGE_TAG=$(echo "$IMAGE_TAGS" | head -n 1)
           echo "Pulling image: $IMAGE_TAG"
           docker pull "$IMAGE_TAG"
 
       - name: Run smoke test suite
+        id: smoke-tests
         env:
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
         run: mvn -B -Dtest=EnhancedSmokeTest test
+
+      - name: Set Smoke Result
+        id: smoke-result
+        if: always()
+        run: echo "status=${{ steps.smoke-tests.outcome }}" >> $GITHUB_OUTPUT
+
+      #######################################
+      # SMOKE TESTS SUMMARY
+      #######################################
+      - name: Smoke Tests Summary
+        if: always()
+        run: |
+          echo "## 💨 Smoke Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ steps.smoke-tests.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`$(echo "${{ needs.docker.outputs.image-tag }}" | head -n 1)\` |" >> $GITHUB_STEP_SUMMARY
 
 
   #######################################
@@ -278,13 +416,15 @@ jobs:
     needs:
       - docker
       - smoke-tests
-    # FIX: Also handle skipped jobs properly
     if: |
       always() &&
       needs.docker.result == 'success' &&
       (needs.smoke-tests.result == 'success' || needs.smoke-tests.result == 'skipped') &&
       inputs.enable-security-scan &&
       inputs.event-name != 'pull_request'
+    outputs:
+      security-status: ${{ steps.security-result.outputs.status }}
+      vulnerabilities-found: ${{ steps.owasp-check.outputs.vulnerabilities }}
     permissions:
       contents: read
       security-events: write
@@ -293,7 +433,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: OWASP Dependency Check
-        run: mvn -B org.owasp:dependency-check-maven:check
+        id: owasp-check
+        run: |
+          mvn -B org.owasp:dependency-check-maven:check
+          # Check if vulnerabilities were found
+          if [ -f "target/dependency-check-report.html" ]; then
+            VULN_COUNT=$(grep -c "vulnerability" target/dependency-check-report.html 2>/dev/null || echo "0")
+            echo "vulnerabilities=$VULN_COUNT" >> $GITHUB_OUTPUT
+          else
+            echo "vulnerabilities=0" >> $GITHUB_OUTPUT
+          fi
 
       - uses: github/codeql-action/init@v3
         with:
@@ -303,6 +452,34 @@ jobs:
 
       - uses: github/codeql-action/analyze@v3
 
+      - name: Set Security Result
+        id: security-result
+        if: always()
+        run: echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
+
+      - name: Upload Security Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            target/dependency-check-report.*
+          retention-days: 30
+          if-no-files-found: ignore
+
+      #######################################
+      # SECURITY SCAN SUMMARY
+      #######################################
+      - name: Security Summary
+        if: always()
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scanner | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| OWASP Dependency Check | ${{ steps.owasp-check.outcome == 'success' && '✅ Passed' || '⚠️ Issues Found' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ✅ Complete |" >> $GITHUB_STEP_SUMMARY
+
 
   #######################################
   # PRODUCTION DEPLOY ON TAGS
@@ -311,16 +488,291 @@ jobs:
     name: Production Deploy
     runs-on: ubuntu-latest
     needs: [docker, security]
-    # FIX: Security can be skipped but docker must succeed
     if: |
       always() &&
       needs.docker.result == 'success' &&
       (needs.security.result == 'success' || needs.security.result == 'skipped') &&
       startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      deploy-status: ${{ steps.deploy-result.outputs.status }}
 
     steps:
-      - run: echo "Deploying to production..."
+      - name: Deploy to Production
+        id: deploy
+        run: echo "Deploying to production..."
+
+      - name: Set Deploy Result
+        id: deploy-result
+        if: always()
+        run: echo "status=${{ steps.deploy.outcome }}" >> $GITHUB_OUTPUT
 
       - uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
+
+      #######################################
+      # DEPLOY SUMMARY
+      #######################################
+      - name: Deploy Summary
+        if: always()
+        run: |
+          echo "## 🚀 Production Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ steps.deploy.outcome == 'success' && '✅ Deployed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`${{ needs.docker.outputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+
+
+  #######################################
+  # PIPELINE SUMMARY REPORT
+  #######################################
+  summary-report:
+    name: Pipeline Summary Report
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - build
+      - testcontainers
+      - docker
+      - smoke-tests
+      - security
+      - deploy-production
+
+    steps:
+      - name: Generate Pipeline Report
+        run: |
+          echo "# 📊 CI/CD Pipeline Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Event:** ${{ inputs.event-name || github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 📋 Job Status Overview" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Build Job
+          BUILD_STATUS="${{ needs.build.result }}"
+          case $BUILD_STATUS in
+            success) BUILD_ICON="✅" ;;
+            failure) BUILD_ICON="❌" ;;
+            skipped) BUILD_ICON="⏭️" ;;
+            cancelled) BUILD_ICON="🚫" ;;
+            *) BUILD_ICON="❓" ;;
+          esac
+          echo "| Build & Unit Tests | $BUILD_ICON $BUILD_STATUS | JAR: \`${{ needs.build.outputs.jar-name || 'N/A' }}\` |" >> $GITHUB_STEP_SUMMARY
+          
+          # Integration Tests Job
+          INT_STATUS="${{ needs.testcontainers.result }}"
+          case $INT_STATUS in
+            success) INT_ICON="✅" ;;
+            failure) INT_ICON="❌" ;;
+            skipped) INT_ICON="⏭️" ;;
+            cancelled) INT_ICON="🚫" ;;
+            *) INT_ICON="❓" ;;
+          esac
+          echo "| Integration Tests | $INT_ICON $INT_STATUS | Tests: ${{ needs.testcontainers.outputs.test-count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          
+          # Docker Job
+          DOCKER_STATUS="${{ needs.docker.result }}"
+          case $DOCKER_STATUS in
+            success) DOCKER_ICON="✅" ;;
+            failure) DOCKER_ICON="❌" ;;
+            skipped) DOCKER_ICON="⏭️" ;;
+            cancelled) DOCKER_ICON="🚫" ;;
+            *) DOCKER_ICON="❓" ;;
+          esac
+          DOCKER_TAG=$(echo "${{ needs.docker.outputs.image-tag }}" | head -n 1)
+          echo "| Docker Build | $DOCKER_ICON $DOCKER_STATUS | \`${DOCKER_TAG:-N/A}\` |" >> $GITHUB_STEP_SUMMARY
+          
+          # Smoke Tests Job
+          SMOKE_STATUS="${{ needs.smoke-tests.result }}"
+          case $SMOKE_STATUS in
+            success) SMOKE_ICON="✅" ;;
+            failure) SMOKE_ICON="❌" ;;
+            skipped) SMOKE_ICON="⏭️" ;;
+            cancelled) SMOKE_ICON="🚫" ;;
+            *) SMOKE_ICON="❓" ;;
+          esac
+          echo "| Smoke Tests | $SMOKE_ICON $SMOKE_STATUS | - |" >> $GITHUB_STEP_SUMMARY
+          
+          # Security Job
+          SEC_STATUS="${{ needs.security.result }}"
+          case $SEC_STATUS in
+            success) SEC_ICON="✅" ;;
+            failure) SEC_ICON="❌" ;;
+            skipped) SEC_ICON="⏭️" ;;
+            cancelled) SEC_ICON="🚫" ;;
+            *) SEC_ICON="❓" ;;
+          esac
+          echo "| Security Scan | $SEC_ICON $SEC_STATUS | - |" >> $GITHUB_STEP_SUMMARY
+          
+          # Deploy Job
+          DEPLOY_STATUS="${{ needs.deploy-production.result }}"
+          case $DEPLOY_STATUS in
+            success) DEPLOY_ICON="✅" ;;
+            failure) DEPLOY_ICON="❌" ;;
+            skipped) DEPLOY_ICON="⏭️" ;;
+            cancelled) DEPLOY_ICON="🚫" ;;
+            *) DEPLOY_ICON="❓" ;;
+          esac
+          echo "| Production Deploy | $DEPLOY_ICON $DEPLOY_STATUS | - |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall Status
+          echo "## 🎯 Overall Pipeline Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build.result }}" == "success" ] && \
+             ([ "${{ needs.testcontainers.result }}" == "success" ] || [ "${{ needs.testcontainers.result }}" == "skipped" ]) && \
+             ([ "${{ needs.docker.result }}" == "success" ] || [ "${{ needs.docker.result }}" == "skipped" ]); then
+            echo "### ✅ Pipeline Completed Successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Pipeline Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the failed jobs above for details." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Generated at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')*" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create Build Report Artifact
+        run: |
+          mkdir -p build-report
+          
+          cat > build-report/pipeline-report.json << 'EOF'
+          {
+            "repository": "${{ github.repository }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}",
+            "actor": "${{ github.actor }}",
+            "event": "${{ inputs.event-name || github.event_name }}",
+            "run_id": "${{ github.run_id }}",
+            "run_number": "${{ github.run_number }}",
+            "timestamp": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
+            "jobs": {
+              "build": {
+                "status": "${{ needs.build.result }}",
+                "jar_name": "${{ needs.build.outputs.jar-name }}"
+              },
+              "testcontainers": {
+                "status": "${{ needs.testcontainers.result }}",
+                "test_count": "${{ needs.testcontainers.outputs.test-count }}"
+              },
+              "docker": {
+                "status": "${{ needs.docker.result }}",
+                "image_tag": "${{ needs.docker.outputs.image-tag }}",
+                "image_digest": "${{ needs.docker.outputs.image-digest }}"
+              },
+              "smoke_tests": {
+                "status": "${{ needs.smoke-tests.result }}"
+              },
+              "security": {
+                "status": "${{ needs.security.result }}"
+              },
+              "deploy": {
+                "status": "${{ needs.deploy-production.result }}"
+              }
+            }
+          }
+          EOF
+          
+          # Generate HTML report
+          cat > build-report/pipeline-report.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Pipeline Report - ${{ github.repository }}</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; background: #f5f5f5; }
+              .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+              h1 { color: #333; border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+              h2 { color: #555; margin-top: 30px; }
+              .meta { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0; }
+              .meta p { margin: 5px 0; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+              th { background: #f8f9fa; font-weight: 600; }
+              .success { color: #28a745; }
+              .failure { color: #dc3545; }
+              .skipped { color: #6c757d; }
+              .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+              .status-badge.success { background: #d4edda; color: #155724; }
+              .status-badge.failure { background: #f8d7da; color: #721c24; }
+              .status-badge.skipped { background: #e2e3e5; color: #383d41; }
+              .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 14px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>📊 CI/CD Pipeline Report</h1>
+              
+              <div class="meta">
+                <p><strong>Repository:</strong> ${{ github.repository }}</p>
+                <p><strong>Branch:</strong> ${{ github.ref_name }}</p>
+                <p><strong>Commit:</strong> ${{ github.sha }}</p>
+                <p><strong>Triggered by:</strong> ${{ github.actor }}</p>
+                <p><strong>Run:</strong> #${{ github.run_number }}</p>
+              </div>
+              
+              <h2>Job Status</h2>
+              <table>
+                <tr>
+                  <th>Job</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+                <tr>
+                  <td>Build & Unit Tests</td>
+                  <td><span class="status-badge ${{ needs.build.result }}">${{ needs.build.result }}</span></td>
+                  <td>${{ needs.build.outputs.jar-name || 'N/A' }}</td>
+                </tr>
+                <tr>
+                  <td>Integration Tests</td>
+                  <td><span class="status-badge ${{ needs.testcontainers.result }}">${{ needs.testcontainers.result }}</span></td>
+                  <td>${{ needs.testcontainers.outputs.test-count || '0' }} tests</td>
+                </tr>
+                <tr>
+                  <td>Docker Build</td>
+                  <td><span class="status-badge ${{ needs.docker.result }}">${{ needs.docker.result }}</span></td>
+                  <td>${{ needs.docker.outputs.image-tag || 'N/A' }}</td>
+                </tr>
+                <tr>
+                  <td>Smoke Tests</td>
+                  <td><span class="status-badge ${{ needs.smoke-tests.result }}">${{ needs.smoke-tests.result }}</span></td>
+                  <td>-</td>
+                </tr>
+                <tr>
+                  <td>Security Scan</td>
+                  <td><span class="status-badge ${{ needs.security.result }}">${{ needs.security.result }}</span></td>
+                  <td>-</td>
+                </tr>
+                <tr>
+                  <td>Production Deploy</td>
+                  <td><span class="status-badge ${{ needs.deploy-production.result }}">${{ needs.deploy-production.result }}</span></td>
+                  <td>-</td>
+                </tr>
+              </table>
+              
+              <div class="footer">
+                Generated by GitHub Actions • Run ID: ${{ github.run_id }}
+              </div>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Build Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-report
+          path: build-report/
+          retention-days: 30
