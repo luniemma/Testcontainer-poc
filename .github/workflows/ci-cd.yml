@@ -38,7 +38,7 @@ on:
 
     outputs:
       image-tag:
-        value: ${{ jobs.build.outputs.image-tag }}
+        value: ${{ jobs.docker.outputs['image-tag'] }}
 
 permissions:
   contents: read
@@ -146,7 +146,7 @@ jobs:
     needs: [build, testcontainers]
     if: ${{ inputs.event-name != 'pull_request' }}
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
+      image-tag: ${{ fromJson(steps.meta.outputs.json).tags[0] }}
 
     steps:
       - uses: actions/checkout@v4
@@ -166,6 +166,7 @@ jobs:
         with:
           images: docker.io/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=latest
             type=sha
 
       - uses: docker/build-push-action@v5
@@ -178,7 +179,7 @@ jobs:
       - name: Upload SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ steps.meta.outputs.tags }}
+          image: ${{ fromJson(steps.meta.outputs.json).tags[0] }}
           format: spdx-json
           output-file: sbom.spdx.json
 
@@ -228,7 +229,7 @@ jobs:
 
       - name: Pull published image
         env:
-          IMAGE_TAGS: ${{ needs.docker.outputs.image-tag }}
+          IMAGE_TAGS: ${{ needs.docker.outputs['image-tag'] }}
         run: |
           if [ -z "$IMAGE_TAGS" ]; then
             echo "No image tags were produced by the docker job" >&2
