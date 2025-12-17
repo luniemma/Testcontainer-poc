@@ -441,7 +441,7 @@ For questions or issues with the Smoke Test Framework:
 
 ## Version History
 
-- **v1.0.0** (2024-12-06) - Initial release
+- **v1.0.0** (2025-12-16) - Initial release
   - Core framework with Testcontainers and external service validation
   - Health check utilities
   - Multi-format reporting
