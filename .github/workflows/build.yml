@@ -7,6 +7,11 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
+# IMPORTANT: Prevent concurrent workflows to avoid TC Cloud rate limits
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true  # Cancel old runs when new push happens
+
 jobs:
   build:
     permissions:
