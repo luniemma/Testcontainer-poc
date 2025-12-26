@@ -142,7 +142,7 @@ jobs:
     needs: build
     if: ${{ always() && !cancelled() && needs.build.result == 'success' && inputs.event-name != 'pull_request' }}
     outputs:
-      image-tag: ${{ steps.primary-tag.outputs.primary-tag }}
+      image-tag: ${{ steps.save-tag.outputs.image-tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -169,54 +169,24 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
-      # Debug: Show what metadata action produced
-      - name: Debug - Show metadata outputs
-        run: |
-          echo "=== Metadata Action Outputs ==="
-          echo "tags output:"
-          echo "${{ steps.meta.outputs.tags }}"
-          echo "---"
-          echo "version output:"
-          echo "${{ steps.meta.outputs.version }}"
-          echo "---"
-          echo "labels output:"
-          echo "${{ steps.meta.outputs.labels }}"
-          echo "==============================="
-
-      # Extract first tag for outputs and SBOM (single-line string)
-      - name: Extract primary image tag
-        id: primary-tag
+      - name: Extract and save primary image tag
+        id: save-tag
         run: |
           TAGS="${{ steps.meta.outputs.tags }}"
-          echo "Raw tags value:"
+          echo "All tags from metadata:"
           echo "$TAGS"
           echo "---"
           
-          if [ -z "$TAGS" ]; then
-            echo "ERROR: metadata-action produced no tags" >&2
-            exit 1
-          fi
-          
           PRIMARY_TAG=$(echo "$TAGS" | head -n 1)
+          echo "Primary tag: $PRIMARY_TAG"
           
-          if [ -z "$PRIMARY_TAG" ]; then
-            echo "ERROR: Failed to extract primary tag from metadata output" >&2
-            exit 1
-          fi
+          # Save to file for artifact
+          echo "$PRIMARY_TAG" > image-tag.txt
           
-          echo "primary-tag=$PRIMARY_TAG" >> $GITHUB_OUTPUT
-          echo "✅ Primary tag extracted and set in output: $PRIMARY_TAG"
-
-      # Verify the output was set correctly
-      - name: Verify primary tag output
-        run: |
-          echo "Verifying step output was set..."
-          echo "primary-tag value: ${{ steps.primary-tag.outputs.primary-tag }}"
-          if [ -z "${{ steps.primary-tag.outputs.primary-tag }}" ]; then
-            echo "ERROR: primary-tag output is empty after extraction step" >&2
-            exit 1
-          fi
-          echo "✅ Output verified successfully"
+          # Save to output
+          echo "image-tag=$PRIMARY_TAG" >> $GITHUB_OUTPUT
+          
+          echo "✅ Tag saved: $PRIMARY_TAG"
 
       - uses: docker/build-push-action@v5
         with:
@@ -229,7 +199,7 @@ jobs:
       - name: Upload SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ steps.primary-tag.outputs.primary-tag }}
+          image: ${{ steps.save-tag.outputs.image-tag }}
           format: spdx-json
           output-file: sbom.spdx.json
 
@@ -237,6 +207,13 @@ jobs:
         with:
           name: sbom
           path: sbom.spdx.json
+
+      # Upload image tag as artifact as backup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-tag
+          path: image-tag.txt
+          retention-days: 1
 
 
   #######################################
@@ -251,7 +228,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Check if TC_CLOUD_TOKEN is available - skip remaining steps if not
+      # Check if TC_CLOUD_TOKEN is available
       - name: Check for Testcontainers Cloud token
         id: check-token
         env:
@@ -265,31 +242,34 @@ jobs:
             echo "has-token=true" >> $GITHUB_OUTPUT
           fi
 
-      # Debug: Show what we received from docker job
-      - name: Debug - Show received image tag
+      # Download image tag from artifact (fallback method)
+      - name: Download image tag artifact
         if: steps.check-token.outputs.has-token == 'true'
-        env:
-          IMAGE_TAG: ${{ needs.docker.outputs.image-tag }}
+        uses: actions/download-artifact@v4
+        with:
+          name: image-tag
+
+      # Get image tag from artifact or job output
+      - name: Get image tag
+        if: steps.check-token.outputs.has-token == 'true'
+        id: get-tag
         run: |
-          echo "=== Smoke Tests - Image Tag Debug ==="
-          echo "Received IMAGE_TAG from docker job output:"
-          echo "'$IMAGE_TAG'"
-          echo "Length: ${#IMAGE_TAG}"
-          echo "======================================"
+          # Try job output first
+          JOB_OUTPUT="${{ needs.docker.outputs.image-tag }}"
           
-          if [ -z "$IMAGE_TAG" ]; then
-            echo ""
-            echo "❌ ERROR: Docker job succeeded but produced no image tag" >&2
-            echo ""
-            echo "Troubleshooting steps:" >&2
-            echo "1. Check the docker job logs for 'Debug - Show metadata outputs'" >&2
-            echo "2. Check the docker job logs for 'Extract primary image tag'" >&2
-            echo "3. Check the docker job logs for 'Verify primary tag output'" >&2
-            echo "4. Verify the job output is correctly set in the docker job definition" >&2
+          if [ -n "$JOB_OUTPUT" ]; then
+            IMAGE_TAG="$JOB_OUTPUT"
+            echo "✅ Using image tag from job output: $IMAGE_TAG"
+          elif [ -f "image-tag.txt" ]; then
+            IMAGE_TAG=$(cat image-tag.txt)
+            echo "✅ Using image tag from artifact: $IMAGE_TAG"
+          else
+            echo "❌ ERROR: Could not get image tag from job output or artifact" >&2
             exit 1
           fi
           
-          echo "✅ Image tag received successfully"
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "Final image tag: $IMAGE_TAG"
 
       - uses: actions/setup-java@v4
         if: steps.check-token.outputs.has-token == 'true'
@@ -315,7 +295,7 @@ jobs:
         if: steps.check-token.outputs.has-token == 'true'
         env:
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
-          IMAGE_TAG: ${{ needs.docker.outputs.image-tag }}
+          IMAGE_TAG: ${{ steps.get-tag.outputs.image-tag }}
         run: mvn -B -Dtest=EnhancedSmokeTest test
 
 
