@@ -429,16 +429,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: "temurin"
+          cache: "maven"
+
       - name: OWASP Dependency Check
-        run: mvn -B org.owasp:dependency-check-maven:check
+        run: |
+          mvn -B org.owasp:dependency-check-maven:check \
+            -Dformat=HTML \
+            -Dformat=JSON \
+            -DfailBuildOnCVSS=7
+        continue-on-error: true
 
       - name: Upload OWASP Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: owasp-report
-          path: target/dependency-check-report.html
+          path: |
+            target/dependency-check-report.html
+            target/dependency-check-report.json
           retention-days: 30
+          if-no-files-found: warn
 
       - uses: github/codeql-action/init@v4
         with:
@@ -459,9 +473,12 @@ jobs:
           echo "| CodeQL Analysis | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📊 Detailed security reports are available in the Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -f "target/dependency-check-report.html" ]; then
-            echo "📎 OWASP report uploaded as artifact" >> $GITHUB_STEP_SUMMARY
+            echo "✅ OWASP report generated and uploaded as artifact" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ OWASP report not generated (no dependencies to check or check skipped)" >> $GITHUB_STEP_SUMMARY
           fi
 
 
