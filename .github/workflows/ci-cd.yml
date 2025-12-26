@@ -188,10 +188,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      # Extract first tag for SBOM action
+      - name: Extract primary image tag
+        id: primary-tag
+        run: |
+          PRIMARY_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
+          echo "primary-tag=$PRIMARY_TAG" >> $GITHUB_OUTPUT
+          echo "Using primary tag for SBOM: $PRIMARY_TAG"
+
       - name: Upload SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ steps.meta.outputs.tags }}
+          image: ${{ steps.primary-tag.outputs.primary-tag }}
           format: spdx-json
           output-file: sbom.spdx.json
 
