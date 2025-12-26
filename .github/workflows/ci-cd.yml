@@ -245,14 +245,6 @@ jobs:
         with:
           token: ${{ secrets.TC_CLOUD_TOKEN }}
 
-      - name: Pull published image
-        env:
-          IMAGE_TAGS: ${{ needs.docker.outputs.image-tag }}
-        run: |
-          IMAGE_TAG=$(echo "$IMAGE_TAGS" | head -n 1)
-          echo "Pulling image: $IMAGE_TAG"
-          docker pull "$IMAGE_TAG"
-
       - name: Run smoke test suite
         env:
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
