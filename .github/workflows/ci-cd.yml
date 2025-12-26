@@ -162,6 +162,7 @@ jobs:
         with:
           images: docker.io/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=latest
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
