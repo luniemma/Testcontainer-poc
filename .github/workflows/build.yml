@@ -11,6 +11,7 @@ jobs:
   build:
     permissions:
       contents: read
+      checks: write           # ← ADD THIS LINE to fix test result publishing
       security-events: write
     uses: ./.github/workflows/ci-cd.yml
     with:
