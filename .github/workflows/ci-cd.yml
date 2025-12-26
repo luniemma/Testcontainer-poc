@@ -168,26 +168,54 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
+      # Debug: Show what metadata action produced
+      - name: Debug - Show metadata outputs
+        run: |
+          echo "=== Metadata Action Outputs ==="
+          echo "tags output:"
+          echo "${{ steps.meta.outputs.tags }}"
+          echo "---"
+          echo "version output:"
+          echo "${{ steps.meta.outputs.version }}"
+          echo "---"
+          echo "labels output:"
+          echo "${{ steps.meta.outputs.labels }}"
+          echo "==============================="
+
       # Extract first tag for outputs and SBOM (single-line string)
       - name: Extract primary image tag
         id: primary-tag
         run: |
-          PRIMARY_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
-          echo "primary-tag=$PRIMARY_TAG" >> $GITHUB_OUTPUT
-          echo "✅ Primary tag extracted: $PRIMARY_TAG"
-
-      # Debug: Verify tags were generated
-      - name: Debug - Show all generated tags
-        run: |
-          echo "All generated tags:"
-          echo "${{ steps.meta.outputs.tags }}"
+          TAGS="${{ steps.meta.outputs.tags }}"
+          echo "Raw tags value:"
+          echo "$TAGS"
           echo "---"
-          echo "Primary tag (will be used for output):"
-          echo "${{ steps.primary-tag.outputs.primary-tag }}"
-          if [ -z "${{ steps.primary-tag.outputs.primary-tag }}" ]; then
-            echo "ERROR: No primary tag was extracted" >&2
+          
+          if [ -z "$TAGS" ]; then
+            echo "ERROR: metadata-action produced no tags" >&2
             exit 1
           fi
+          
+          PRIMARY_TAG=$(echo "$TAGS" | head -n 1)
+          
+          if [ -z "$PRIMARY_TAG" ]; then
+            echo "ERROR: Failed to extract primary tag from metadata output" >&2
+            exit 1
+          fi
+          
+          echo "primary-tag=$PRIMARY_TAG" >> $GITHUB_OUTPUT
+          echo "✅ Primary tag extracted and set in output: $PRIMARY_TAG"
+
+      # Verify the output was set correctly
+      - name: Verify primary tag output
+        run: |
+          echo "Verifying step output was set..."
+          echo "primary-tag value: ${{ steps.primary-tag.outputs.primary-tag }}"
+          if [ -z "${{ steps.primary-tag.outputs.primary-tag }}" ]; then
+            echo "ERROR: primary-tag output is empty after extraction step" >&2
+            exit 1
+          fi
+          echo "✅ Output verified successfully"
 
       - uses: docker/build-push-action@v5
         with:
@@ -217,7 +245,6 @@ jobs:
     name: Container Smoke Tests (Testcontainers Cloud)
     runs-on: ubuntu-latest
     needs: docker
-    # CRITICAL: Do NOT check secrets here - only check if docker succeeded
     if: ${{ always() && !cancelled() && needs.docker.result == 'success' }}
 
     steps:
@@ -243,15 +270,25 @@ jobs:
         env:
           IMAGE_TAG: ${{ needs.docker.outputs.image-tag }}
         run: |
-          echo "Received IMAGE_TAG from docker job:"
-          echo "$IMAGE_TAG"
-          echo "---"
+          echo "=== Smoke Tests - Image Tag Debug ==="
+          echo "Received IMAGE_TAG from docker job output:"
+          echo "'$IMAGE_TAG'"
+          echo "Length: ${#IMAGE_TAG}"
+          echo "======================================"
+          
           if [ -z "$IMAGE_TAG" ]; then
-            echo "ERROR: Docker job succeeded but produced no image tag" >&2
-            echo "This indicates the primary-tag step failed" >&2
-            echo "Check the docker job logs for the 'Extract primary image tag' step" >&2
+            echo ""
+            echo "❌ ERROR: Docker job succeeded but produced no image tag" >&2
+            echo ""
+            echo "Troubleshooting steps:" >&2
+            echo "1. Check the docker job logs for 'Debug - Show metadata outputs'" >&2
+            echo "2. Check the docker job logs for 'Extract primary image tag'" >&2
+            echo "3. Check the docker job logs for 'Verify primary tag output'" >&2
+            echo "4. Verify the job output is correctly set in the docker job definition" >&2
             exit 1
           fi
+          
+          echo "✅ Image tag received successfully"
 
       - uses: actions/setup-java@v4
         if: steps.check-token.outputs.has-token == 'true'
