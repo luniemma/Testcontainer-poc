@@ -40,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 env:
   REGISTRY: docker.io
@@ -73,6 +74,7 @@ jobs:
         if: ${{ always() && inputs.run-tests }}
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             target/surefire-reports/*.xml
           check_name: Unit Test Results
@@ -153,6 +155,7 @@ jobs:
         if: always()
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             target/surefire-reports/*.xml
             target/failsafe-reports/*.xml
@@ -379,6 +382,7 @@ jobs:
         if: always() && steps.check-token.outputs.has-token == 'true'
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             target/surefire-reports/*.xml
           check_name: Smoke Test Results
