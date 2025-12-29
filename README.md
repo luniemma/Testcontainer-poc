@@ -112,11 +112,111 @@ Run smoke tests only:
 mvn test -Dtest=EnhancedSmokeTest
 ```
 
-## CI/CD
+## CI/CD Pipeline
 
-GitHub Actions workflows:
-- **ci-cd.yml** - Continuous integration and testing
-- **build.yml** - Docker image build and push
-- **release.yml** - Release management
+The project uses a comprehensive GitHub Actions pipeline with multiple stages and quality gates.
 
-Testcontainer-poc
+### Pipeline Architecture
+
+The CI/CD pipeline is implemented as a reusable workflow (`ci-cd.yml`) that is called by:
+- **build.yml** - Runs on push to main/develop and pull requests
+- **release.yml** - Runs on version tags (v*.*.*)
+
+### Pipeline Stages
+
+#### 1. Build & Unit Tests
+- Compiles the application with Maven
+- Runs unit tests
+- Publishes test results with detailed reports
+- Uploads JAR artifact
+- Runs SonarCloud analysis (if token available)
+
+#### 2. Integration Tests (Testcontainers)
+- Runs integration tests for Cassandra, Kafka, and Redis
+- Uses Testcontainers for infrastructure
+- Publishes test results and reports
+- Generates test summary with pass/fail metrics
+
+#### 3. Docker Build & Push
+- Builds multi-platform Docker images (amd64, arm64)
+- Pushes to Docker registry
+- Generates SBOM (Software Bill of Materials)
+- Creates multiple tags: latest, branch name, SHA, semver
+- Skipped for pull requests
+
+#### 4. Smoke Tests (Testcontainers Cloud)
+- Runs comprehensive smoke tests on the published Docker image
+- Uses Testcontainers Cloud for remote container execution
+- Validates all service integrations end-to-end
+- Publishes smoke test results
+- Automatically skipped if TC_CLOUD_TOKEN not available
+
+#### 5. Security Scan
+- OWASP Dependency Check for vulnerabilities
+- CodeQL static analysis for code security issues
+- Uploads security reports as artifacts
+- Only runs on non-PR events
+
+#### 6. Production Deploy
+- Automatically triggers on version tags (v*.*.*)
+- Creates GitHub release with auto-generated notes
+- Only runs if all previous stages pass
+
+#### 7. Pipeline Summary
+- Generates comprehensive summary of all job results
+- Shows pass/fail status for each stage
+- Displays Docker image tag
+- Provides links to artifacts and detailed logs
+
+### Required Secrets
+
+Configure these in your GitHub repository settings:
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `DOCKER_USERNAME` | Yes | Docker Hub username |
+| `DOCKER_PASSWORD` | Yes | Docker Hub access token |
+| `SONAR_TOKEN` | No | SonarCloud authentication token |
+| `TC_CLOUD_TOKEN` | No | Testcontainers Cloud token for smoke tests |
+
+### Workflow Triggers
+
+**build.yml**:
+- Push to `main` or `develop` branches
+- Pull requests to `main` or `develop`
+- Manual workflow dispatch
+
+**release.yml**:
+- Git tags matching `v*.*.*` pattern (e.g., v1.0.0)
+
+### Pipeline Features
+
+- **Test Result Publishing**: All test results appear as check runs in PRs
+- **Job Summaries**: Each job generates a markdown summary with key metrics
+- **Artifact Management**: Test reports, SBOM, and build artifacts retained
+- **Conditional Execution**: Jobs skip gracefully when dependencies fail or secrets unavailable
+- **Multi-platform Builds**: Docker images for both AMD64 and ARM64
+- **Security Integration**: Automated vulnerability scanning and code analysis
+
+### Viewing Pipeline Results
+
+1. **GitHub Actions Tab**: See overall pipeline status and job logs
+2. **Pull Request Checks**: Test results appear as status checks
+3. **Job Summaries**: Click on any job to see detailed metrics and summaries
+4. **Artifacts**: Download test reports, SBOM, and other outputs
+5. **Security Tab**: Review security scan findings
+
+### Local Testing
+
+Before pushing, test the pipeline stages locally:
+
+```bash
+# Run all tests
+mvn verify
+
+# Build Docker image
+docker build -t testcontainers-demo:latest .
+
+# Run smoke tests
+mvn test -Dtest=EnhancedSmokeTest
+```
