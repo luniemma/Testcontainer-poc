@@ -63,14 +63,20 @@ function App() {
                 </span>
               </div>
               <div className="flex flex-wrap gap-4">
-                <button className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 hover:scale-105 hover:shadow-lg group">
+                <a
+                  href="#quick-start"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 hover:scale-105 hover:shadow-lg group"
+                >
                   Get Started
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-                <button className="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-900 rounded-lg font-semibold hover:bg-slate-200 transition-all duration-300 hover:scale-105">
+                </a>
+                <a
+                  href="#features"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-900 rounded-lg font-semibold hover:bg-slate-200 transition-all duration-300 hover:scale-105"
+                >
                   <Code2 className="w-4 h-4" />
                   View Docs
-                </button>
+                </a>
               </div>
             </div>
             <div className="relative h-64 md:h-auto">
@@ -117,7 +123,7 @@ function App() {
         </div>
 
         {/* Feature Grid with Enhanced Design */}
-        <div className="mb-12">
+        <div id="features" className="mb-12 scroll-mt-20">
           <div className="text-center mb-10">
             <h3 className="text-3xl font-bold text-slate-900 mb-3">Powerful Features</h3>
             <p className="text-lg text-slate-600 max-w-2xl mx-auto">
@@ -294,7 +300,7 @@ function App() {
         </div>
 
         {/* Quick Start with Enhanced Design and Image */}
-        <div className="grid md:grid-cols-2 gap-8 mb-12">
+        <div id="quick-start" className="grid md:grid-cols-2 gap-8 mb-12 scroll-mt-20">
           <div className="relative overflow-hidden rounded-2xl shadow-xl">
             <img
               src="https://images.pexels.com/photos/546819/pexels-photo-546819.jpeg?auto=compress&cs=tinysrgb&w=800"
@@ -328,10 +334,174 @@ function App() {
                 <Github className="w-5 h-5" />
                 View on GitHub
               </a>
-              <button className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 hover:scale-105 hover:shadow-lg">
+              <a
+                href="#documentation"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+              >
                 <Code2 className="w-5 h-5" />
                 Docs
-              </button>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Documentation Section */}
+        <div id="documentation" className="bg-white rounded-2xl shadow-xl p-8 lg:p-12 mb-12 border border-slate-200 scroll-mt-20">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-2xl mb-4">
+              <FileText className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-3xl font-bold text-slate-900 mb-3">Documentation</h3>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              Complete guides and references to get you started with the framework
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="border-l-4 border-blue-500 pl-6">
+                <h4 className="text-xl font-bold text-slate-900 mb-3">Getting Started</h4>
+                <div className="space-y-4 text-slate-700">
+                  <div>
+                    <h5 className="font-semibold mb-2">Prerequisites</h5>
+                    <ul className="space-y-1 text-sm">
+                      <li>• Java 17 or higher</li>
+                      <li>• Maven 3.9+</li>
+                      <li>• Docker Desktop (8GB+ RAM recommended)</li>
+                      <li>• Git for version control</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold mb-2">Installation</h5>
+                    <div className="bg-slate-50 rounded-lg p-4 font-mono text-sm">
+                      <p className="text-slate-600 mb-2"># Clone the repository</p>
+                      <p className="text-slate-900 mb-3">git clone https://github.com/your-org/testcontainers-smoke-test.git</p>
+                      <p className="text-slate-600 mb-2"># Navigate to directory</p>
+                      <p className="text-slate-900 mb-3">cd testcontainers-smoke-test</p>
+                      <p className="text-slate-600 mb-2"># Build the project</p>
+                      <p className="text-slate-900">mvn clean install</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-l-4 border-green-500 pl-6">
+                <h4 className="text-xl font-bold text-slate-900 mb-3">Running Tests</h4>
+                <div className="space-y-3">
+                  <div>
+                    <p className="font-semibold text-sm text-slate-900 mb-2">Run All Tests</p>
+                    <div className="bg-slate-50 rounded-lg p-3 font-mono text-sm">
+                      <p className="text-slate-900">mvn verify</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-slate-900 mb-2">Run Smoke Tests Only</p>
+                    <div className="bg-slate-50 rounded-lg p-3 font-mono text-sm">
+                      <p className="text-slate-900">mvn test -Dtest=EnhancedSmokeTest</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-slate-900 mb-2">Run Specific Integration Test</p>
+                    <div className="bg-slate-50 rounded-lg p-3 font-mono text-sm">
+                      <p className="text-slate-900">mvn test -Dtest=CassandraIntegrationTest</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="border-l-4 border-orange-500 pl-6">
+                <h4 className="text-xl font-bold text-slate-900 mb-3">Configuration</h4>
+                <div className="space-y-4 text-slate-700">
+                  <div>
+                    <h5 className="font-semibold mb-2">Application Properties</h5>
+                    <p className="text-sm mb-3">
+                      Configure services in <code className="bg-slate-100 px-2 py-1 rounded text-xs">application.yml</code>
+                    </p>
+                    <div className="bg-slate-50 rounded-lg p-4 font-mono text-xs">
+                      <p className="text-slate-600"># Cassandra Configuration</p>
+                      <p className="text-slate-900">spring.cassandra.keyspace-name: testcontainers</p>
+                      <p className="text-slate-900 mb-2">spring.cassandra.contact-points: localhost:9042</p>
+                      <p className="text-slate-600"># Redis Configuration</p>
+                      <p className="text-slate-900">spring.data.redis.host: localhost</p>
+                      <p className="text-slate-900">spring.data.redis.port: 6379</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="font-semibold mb-2">Docker Compose</h5>
+                    <p className="text-sm">
+                      Start all services locally:
+                    </p>
+                    <div className="bg-slate-50 rounded-lg p-3 font-mono text-sm mt-2">
+                      <p className="text-slate-900">docker-compose up -d</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-l-4 border-cyan-500 pl-6">
+                <h4 className="text-xl font-bold text-slate-900 mb-3">Key Features</h4>
+                <div className="space-y-3 text-slate-700">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Automatic Container Management</p>
+                      <p className="text-sm text-slate-600">Testcontainers handles lifecycle automatically</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Health Check Validation</p>
+                      <p className="text-sm text-slate-600">Ensures services are ready before tests run</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Comprehensive Reporting</p>
+                      <p className="text-sm text-slate-600">JSON, HTML, and Markdown reports generated</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-cyan-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CheckCircle className="w-4 h-4 text-cyan-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">CI/CD Integration</p>
+                      <p className="text-sm text-slate-600">GitHub Actions, Jenkins, GitLab support</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <FileText className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                  <div>
+                    <h5 className="font-bold text-slate-900 mb-2">Need More Help?</h5>
+                    <p className="text-sm text-slate-700 mb-3">
+                      Check out our comprehensive guides and API documentation
+                    </p>
+                    <div className="flex gap-2">
+                      <a href="https://github.com/your-org/testcontainers-smoke-test/wiki" className="text-sm text-blue-600 hover:text-blue-800 font-semibold">
+                        View Wiki →
+                      </a>
+                      <span className="text-slate-400">|</span>
+                      <a href="https://github.com/your-org/testcontainers-smoke-test/issues" className="text-sm text-blue-600 hover:text-blue-800 font-semibold">
+                        Report Issue →
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
