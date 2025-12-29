@@ -5,6 +5,13 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: read          # For checking out code
+  checks: write           # For publishing test results
+  security-events: write  # For security scanning (CodeQL/Veracode)
+  actions: read           # For downloading artifacts
+  packages: write         # If pushing to GHCR
+
 jobs:
   release:
     uses: ./.github/workflows/ci-cd.yml
@@ -13,7 +20,7 @@ jobs:
       docker-platforms: "linux/amd64,linux/arm64"
       run-tests: true
       enable-security-scan: true
-      sonar-token: ""                    # 🔥 NEVER put secrets here
+      sonar-token: ""
       event-name: ${{ github.event_name }}
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
