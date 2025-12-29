@@ -1,3 +1,5 @@
+name: CI/CD Pipeline
+
 on:
   workflow_call:
     inputs:
@@ -565,8 +567,13 @@ jobs:
       needs.docker.result == 'success' && 
       (needs.security.result == 'success' || needs.security.result == 'skipped') && 
       startsWith(github.ref, 'refs/tags/v')
+    
+    permissions:
+      contents: write  # Required for creating releases
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deployment Summary
         run: |
           echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
@@ -580,11 +587,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Deployment initiated successfully" >> $GITHUB_STEP_SUMMARY
 
-      - run: echo "Deploying to production..."
-
-      - uses: softprops/action-gh-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
 
   #######################################

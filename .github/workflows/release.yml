@@ -1,4 +1,4 @@
-name: Release
+name: Release Pipeline
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: read          # For checking out code
+  contents: write         # For creating releases and checking out code
   checks: write           # For publishing test results
-  security-events: write  # For security scanning (CodeQL/Veracode)
+  security-events: write  # For security scanning (CodeQL/OWASP)
   actions: read           # For downloading artifacts
-  packages: write         # If pushing to GHCR
+  packages: write         # For pushing Docker images (if using GHCR)
 
 jobs:
   release:
@@ -20,9 +20,10 @@ jobs:
       docker-platforms: "linux/amd64,linux/arm64"
       run-tests: true
       enable-security-scan: true
-      sonar-token: ""
+      sonar-token: ""                    # 🔥 NEVER put secrets here
       event-name: ${{ github.event_name }}
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
