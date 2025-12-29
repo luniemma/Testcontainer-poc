@@ -10,7 +10,9 @@ on:
 jobs:
   build:
     permissions:
-      contents: read
+      contents: write
+      actions: write
+      packages: write
       checks: write           # ← ADD THIS LINE to fix test result publishing
       security-events: write
       issues: write
