@@ -7,26 +7,23 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
 jobs:
   build:
-    permissions:
-      contents: write
-      actions: write
-      packages: write
-      checks: write           # ← ADD THIS LINE to fix test result publishing
-      security-events: write
-      issues: write
-      pull-requests: write
     uses: ./.github/workflows/ci-cd.yml
     with:
       java-version: "17"
       docker-platforms: "linux/amd64,linux/arm64"
       run-tests: true
       enable-security-scan: ${{ github.event_name == 'push' }}
-      sonar-token: ""                      # 🔥 DO NOT reference secrets here t
       event-name: ${{ github.event_name }}
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   # 🔥 ONLY this is allowed
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
