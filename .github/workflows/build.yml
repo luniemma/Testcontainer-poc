@@ -7,11 +7,13 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
+# 🔐 PERMISSION ALLOW-LIST (THIS IS THE KEY)
 permissions:
-  contents: read
+  contents: write          # needed for deploy-production
   checks: write
   pull-requests: write
   issues: write
+  security-events: write   # needed for security job (CodeQL / SARIF)
 
 jobs:
   build:
