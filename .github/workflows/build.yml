@@ -16,6 +16,7 @@ jobs:
       checks: write           # ← ADD THIS LINE to fix test result publishing
       security-events: write
       issues: write
+      pull-requests: write
     uses: ./.github/workflows/ci-cd.yml
     with:
       java-version: "17"
