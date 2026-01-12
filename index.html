@@ -5,17 +5,505 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AT&T Testcontainers Smoke Test Framework</title>
-    <meta name="description" content="Production-ready smoke test framework for AT&T organization validating Testcontainers and external service connectivity">
-    <meta property="og:title" content="AT&T Testcontainers Smoke Test Framework">
-    <meta property="og:description" content="Enterprise-grade testing infrastructure with comprehensive container validation and reporting">
-    <meta property="og:image" content="https://bolt.new/static/og_default.png">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="AT&T Testcontainers Smoke Test Framework">
-    <meta name="twitter:description" content="Enterprise-grade testing infrastructure with comprehensive container validation and reporting">
-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
-</head>
+    <meta
+      name="description"
+      content="Production-ready smoke test framework for AT&T organization validating Testcontainers and external service connectivity"
+    />
+    <meta property="og:title" content="AT&T Testcontainers Smoke Test Framework" />
+    <meta
+      property="og:description"
+      content="Enterprise-grade testing infrastructure with comprehensive container validation and reporting"
+    />
+    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AT&T Testcontainers Smoke Test Framework" />
+    <meta
+      name="twitter:description"
+      content="Enterprise-grade testing infrastructure with comprehensive container validation and reporting"
+    />
+    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Manrope", system-ui, -apple-system, sans-serif;
+        --ink: #0f172a;
+        --muted: #475569;
+        --surface: #f8fafc;
+        --accent: #1d4ed8;
+        --accent-strong: #1e40af;
+        --accent-soft: #dbeafe;
+        --line: #e2e8f0;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: radial-gradient(circle at top, #e0f2fe 0%, #f8fafc 45%, #ffffff 100%);
+        color: var(--ink);
+        min-height: 100vh;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      img {
+        max-width: 100%;
+        display: block;
+      }
+
+      .page {
+        display: flex;
+        flex-direction: column;
+        gap: 6rem;
+      }
+
+      .container {
+        width: min(1200px, 90vw);
+        margin: 0 auto;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 2rem 0 1rem;
+      }
+
+      .logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .logo-mark {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #2563eb, #7dd3fc);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 700;
+      }
+
+      .nav {
+        display: flex;
+        gap: 1.5rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .hero {
+        display: grid;
+        gap: 3rem;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        align-items: center;
+      }
+
+      .hero h1 {
+        font-size: clamp(2.5rem, 4vw, 3.8rem);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        margin-bottom: 1.5rem;
+      }
+
+      .hero p {
+        color: var(--muted);
+        font-size: 1.1rem;
+        line-height: 1.7;
+        margin-bottom: 2rem;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 0.9rem 1.7rem;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 20px 40px rgba(29, 78, 216, 0.2);
+      }
+
+      .btn-secondary {
+        background: #fff;
+        border-color: var(--line);
+        color: var(--ink);
+      }
+
+      .hero-card {
+        border-radius: 24px;
+        background: #ffffffcc;
+        padding: 1.8rem;
+        border: 1px solid #ffffff;
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.1);
+        backdrop-filter: blur(12px);
+      }
+
+      .hero-card img {
+        border-radius: 18px;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        margin-bottom: 1.5rem;
+      }
+
+      .hero-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+      }
+
+      .metric {
+        background: var(--surface);
+        border-radius: 16px;
+        padding: 1rem;
+        border: 1px solid var(--line);
+      }
+
+      .metric h3 {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .section-title {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+      }
+
+      .section-subtitle {
+        color: var(--muted);
+        max-width: 640px;
+        line-height: 1.6;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2.5rem;
+      }
+
+      .feature-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.5rem;
+        border: 1px solid var(--line);
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .feature-card h3 {
+        font-size: 1.2rem;
+      }
+
+      .feature-card p {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.2rem;
+        margin-top: 2rem;
+      }
+
+      .gallery img {
+        border-radius: 18px;
+        height: 220px;
+        object-fit: cover;
+        border: 1px solid #fff;
+        box-shadow: 0 15px 30px rgba(15, 23, 42, 0.12);
+      }
+
+      .integration {
+        display: grid;
+        gap: 2rem;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        align-items: center;
+        padding: 2.5rem;
+        background: linear-gradient(120deg, #eff6ff, #ffffff);
+        border-radius: 28px;
+        border: 1px solid var(--line);
+        box-shadow: 0 25px 50px rgba(30, 41, 59, 0.08);
+      }
+
+      .integration ul {
+        display: grid;
+        gap: 0.8rem;
+        color: var(--muted);
+      }
+
+      .integration li {
+        list-style: none;
+        display: flex;
+        gap: 0.6rem;
+        align-items: center;
+      }
+
+      .integration li::before {
+        content: "✓";
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-weight: 700;
+      }
+
+      .cta {
+        text-align: center;
+        padding-bottom: 5rem;
+      }
+
+      .cta-card {
+        background: #0f172a;
+        color: #fff;
+        border-radius: 26px;
+        padding: 3rem 2rem;
+        display: grid;
+        gap: 1.5rem;
+        box-shadow: 0 40px 80px rgba(15, 23, 42, 0.3);
+      }
+
+      .cta-card p {
+        color: #cbd5f5;
+      }
+
+      footer {
+        padding: 2rem 0 3rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .app-shell {
+        background: #ffffff;
+        border-radius: 24px;
+        border: 1px dashed var(--line);
+        padding: 2rem;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      @media (max-width: 720px) {
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 1rem;
+        }
+
+        .nav {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
   <body>
-    <div id="root"></div>
+    <div class="page">
+      <div class="container">
+        <header>
+          <a class="logo" href="#">
+            <span class="logo-mark">AT</span>
+            <span>Testcontainers Smoke Test Framework</span>
+          </a>
+          <nav class="nav">
+            <a href="#capabilities">Capabilities</a>
+            <a href="#observability">Observability</a>
+            <a href="#integrations">Integrations</a>
+            <a href="#resources">Resources</a>
+          </nav>
+        </header>
+
+        <section class="hero">
+          <div>
+            <p class="section-subtitle">AT&T Engineering Platform</p>
+            <h1>Modern confidence for every containerized test run.</h1>
+            <p>
+              Proactively validate infrastructure with a unified smoke test framework. Track
+              performance signals, orchestrate reusable containers, and ship with compliance-ready
+              reports built for enterprise scale.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="#resources">View live dashboards</a>
+              <a class="btn btn-secondary" href="#integrations">Explore integrations</a>
+            </div>
+          </div>
+          <div class="hero-card">
+            <img
+              src="https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?auto=format&fit=crop&w=800&q=80"
+              alt="Software engineers collaborating over code"
+            />
+            <div class="hero-metrics">
+              <div class="metric">
+                <h3>99.98%</h3>
+                <span>Pipeline readiness</span>
+              </div>
+              <div class="metric">
+                <h3>120+</h3>
+                <span>Validated services</span>
+              </div>
+              <div class="metric">
+                <h3>35m</h3>
+                <span>Median recovery</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="container" id="capabilities">
+        <h2 class="section-title">Enterprise-grade capabilities</h2>
+        <p class="section-subtitle">
+          The framework delivers repeatable, observable, and secure smoke tests with built-in
+          insights. Compose new environments quickly while maintaining a golden path for every
+          service team.
+        </p>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h3>Container readiness scoring</h3>
+            <p>
+              Automated health checks, dependency resolution, and regression indicators are grouped
+              into a single readiness score for release managers.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Secure secrets orchestration</h3>
+            <p>
+              Connect to vault-backed secrets and service credentials with rotating policies across
+              ephemeral test environments.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Golden-path reporting</h3>
+            <p>
+              Generate compliance-ready exports with auditable logs, SLA tracking, and traceable
+              artifact links.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Performance baselining</h3>
+            <p>
+              Compare latency signals from every container start to ensure test suites stay fast and
+              predictable.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="container" id="observability">
+        <h2 class="section-title">Visual observability snapshots</h2>
+        <p class="section-subtitle">
+          Real-time dashboards make every test suite transparent. Capture images of key services and
+          share them with stakeholders at a glance.
+        </p>
+        <div class="gallery">
+          <img
+            src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80"
+            alt="Analytics dashboard visualization"
+          />
+          <img
+            src="https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=800&q=80"
+            alt="Team reviewing service metrics"
+          />
+          <img
+            src="https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=800&q=80"
+            alt="Engineering team in planning session"
+          />
+          <img
+            src="https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=800&q=80"
+            alt="Data center infrastructure"
+          />
+        </div>
+      </div>
+
+      <div class="container" id="integrations">
+        <div class="integration">
+          <div>
+            <h2 class="section-title">Integrations that scale with your stack</h2>
+            <p class="section-subtitle">
+              Plug into CI/CD, Kubernetes, and enterprise monitoring in minutes. The framework ships
+              with reusable test suites, health contracts, and alert routing that matches AT&T
+              governance.
+            </p>
+          </div>
+          <div>
+            <ul>
+              <li>Service mesh-aware readiness probes</li>
+              <li>Prometheus + Grafana out-of-the-box dashboards</li>
+              <li>Slack &amp; MS Teams alert routing</li>
+              <li>JUnit + Allure export options</li>
+              <li>Automated container lifecycle cleanup</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="container" id="resources">
+        <h2 class="section-title">Live environment</h2>
+        <p class="section-subtitle">
+          This section hosts the interactive app surface. The shell below is enhanced for fast
+          loading, while the React application mounts within to render dynamic data.
+        </p>
+        <div class="app-shell" id="root">
+          Initializing the live dashboard experience...
+        </div>
+      </div>
+
+      <div class="container cta">
+        <div class="cta-card">
+          <h2>Ship with confidence every time.</h2>
+          <p>
+            Accelerate smoke test coverage across AT&T teams with standardized documentation,
+            reusable containers, and an audit trail that scales globally.
+          </p>
+          <div class="hero-actions" style="justify-content: center;">
+            <a class="btn btn-primary" href="#">Download latest report</a>
+            <a class="btn btn-secondary" href="#">Contact platform team</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="container">
+        <p>© 2024 AT&amp;T Testcontainers Platform. Built for resilient engineering operations.</p>
+      </div>
+    </footer>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
