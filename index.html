@@ -232,6 +232,72 @@
         line-height: 1.6;
       }
 
+      .steps {
+        margin-top: 2.5rem;
+        display: grid;
+        gap: 1.5rem;
+      }
+
+      .step-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.75rem;
+        border: 1px solid var(--line);
+        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+        display: grid;
+        gap: 1rem;
+      }
+
+      .step-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .step-number {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-weight: 800;
+        display: grid;
+        place-items: center;
+      }
+
+      .step-card h3 {
+        font-size: 1.3rem;
+      }
+
+      .step-details {
+        display: grid;
+        gap: 0.6rem;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .step-details li {
+        list-style: none;
+        display: flex;
+        gap: 0.65rem;
+        align-items: flex-start;
+      }
+
+      .step-details li::before {
+        content: "•";
+        color: var(--accent-strong);
+        font-weight: 700;
+      }
+
+      .step-media {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #fff;
+        box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+        height: 220px;
+        object-fit: cover;
+      }
+
       .gallery {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -342,6 +408,7 @@
           </a>
           <nav class="nav">
             <a href="#capabilities">Capabilities</a>
+            <a href="#steps">Testcontainers steps</a>
             <a href="#observability">Observability</a>
             <a href="#integrations">Integrations</a>
             <a href="#resources">Resources</a>
@@ -421,6 +488,126 @@
               predictable.
             </p>
           </div>
+        </div>
+      </div>
+
+      <div class="container" id="steps">
+        <h2 class="section-title">Testcontainers workflow, step by step</h2>
+        <p class="section-subtitle">
+          Follow this guided workflow to run smoke tests locally or in CI. Each step outlines what
+          to configure, what to observe, and where the framework captures evidence for release
+          readiness.
+        </p>
+        <div class="steps">
+          <article class="step-card">
+            <div class="step-header">
+              <div class="step-number">1</div>
+              <div>
+                <h3>Bootstrap the test environment</h3>
+                <p class="section-subtitle">
+                  Start with configuration and secure access to shared services.
+                </p>
+              </div>
+            </div>
+            <ul class="step-details">
+              <li>Pull the latest framework image and set your environment variables.</li>
+              <li>Validate secrets and credentials from your vault or key store.</li>
+              <li>Confirm local Docker and Testcontainers dependencies are healthy.</li>
+            </ul>
+            <img
+              class="step-media"
+              src="https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=900&q=80"
+              alt="Engineer preparing development environment"
+            />
+          </article>
+
+          <article class="step-card">
+            <div class="step-header">
+              <div class="step-number">2</div>
+              <div>
+                <h3>Spin up containerized dependencies</h3>
+                <p class="section-subtitle">
+                  The framework orchestrates services, databases, and mocks automatically.
+                </p>
+              </div>
+            </div>
+            <ul class="step-details">
+              <li>Launch containers with reusable baseline configurations.</li>
+              <li>Wait for readiness probes before executing suites.</li>
+              <li>Capture health metrics for every service in real time.</li>
+            </ul>
+            <img
+              class="step-media"
+              src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=80"
+              alt="Dashboard showing container service health"
+            />
+          </article>
+
+          <article class="step-card">
+            <div class="step-header">
+              <div class="step-number">3</div>
+              <div>
+                <h3>Execute smoke test suites</h3>
+                <p class="section-subtitle">
+                  Run targeted checks that confirm core workflows before release.
+                </p>
+              </div>
+            </div>
+            <ul class="step-details">
+              <li>Trigger API, UI, and integration checks with prebuilt runners.</li>
+              <li>Stream logs and traces into the observability dashboard.</li>
+              <li>Automatically retry flaky tests based on policy.</li>
+            </ul>
+            <img
+              class="step-media"
+              src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80"
+              alt="Smoke test execution with real-time logs"
+            />
+          </article>
+
+          <article class="step-card">
+            <div class="step-header">
+              <div class="step-number">4</div>
+              <div>
+                <h3>Analyze results and publish reports</h3>
+                <p class="section-subtitle">
+                  Share evidence, approvals, and performance summaries with stakeholders.
+                </p>
+              </div>
+            </div>
+            <ul class="step-details">
+              <li>Review pass/fail status, latency baselines, and SLA metrics.</li>
+              <li>Export compliance-ready reports to your document repository.</li>
+              <li>Notify release channels with automated summaries.</li>
+            </ul>
+            <img
+              class="step-media"
+              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=80"
+              alt="Report summary and analytics visualization"
+            />
+          </article>
+
+          <article class="step-card">
+            <div class="step-header">
+              <div class="step-number">5</div>
+              <div>
+                <h3>Clean up and optimize</h3>
+                <p class="section-subtitle">
+                  Ensure resources are reclaimed and learnings roll forward.
+                </p>
+              </div>
+            </div>
+            <ul class="step-details">
+              <li>Terminate containers and release allocated resources.</li>
+              <li>Archive artifacts for auditability and trend analysis.</li>
+              <li>Feed lessons learned back into baseline configurations.</li>
+            </ul>
+            <img
+              class="step-media"
+              src="https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=900&q=80"
+              alt="Team reviewing post-run improvements"
+            />
+          </article>
         </div>
       </div>
 
