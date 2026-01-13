@@ -1,4 +1,4 @@
-name: Build
+name: 🚀 Build Pipeline
 
 on:
   push:
@@ -12,14 +12,91 @@ on:
 
 # 🔐 CRITICAL: These permissions are required for the workflow to function properly
 permissions:
-  contents: write          # needed for deploy-production
+  contents: write          # needed for deploy-production and releases
   checks: write            # needed for check runs
   pull-requests: write     # needed for PR comments and updates
   issues: write            # CRITICAL: needed for creating PR comments (PRs are issues in GitHub API)
   security-events: write   # needed for security job (CodeQL / SARIF)
 
 jobs:
+  
+  #######################################
+  # WORKFLOW START BANNER
+  #######################################
+  workflow-start:
+    name: 🎬 Workflow Initialization
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🎯 Print Workflow Banner
+        run: |
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║                                                                ║"
+          echo "║               🚀 CI/CD PIPELINE STARTING 🚀                   ║"
+          echo "║                                                                ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "┌────────────────────────────────────────────────────────────────┐"
+          echo "│                    WORKFLOW INFORMATION                        │"
+          echo "└────────────────────────────────────────────────────────────────┘"
+          echo ""
+          echo "📦 Repository:        ${{ github.repository }}"
+          echo "🔀 Branch:            ${{ github.ref_name }}"
+          echo "📝 Commit SHA:        ${{ github.sha }}"
+          echo "👤 Triggered by:      ${{ github.actor }}"
+          echo "🎭 Event:             ${{ github.event_name }}"
+          echo "🔢 Run Number:        #${{ github.run_number }}"
+          echo "⏰ Started at:        $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+      
+      - name: 📊 Create Workflow Start Summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "║            🚀 CI/CD PIPELINE EXECUTION STARTED                ║" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚════════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Execution Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Repository | \`${{ github.repository }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔀 Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📝 Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Triggered By | **${{ github.actor }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎭 Event Type | **${{ github.event_name }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔢 Run Number | **#${{ github.run_number }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Started At | $(date '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🎬 Pipeline Stages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The following stages will be executed:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. 🏗️ **Build & Unit Tests**" >> $GITHUB_STEP_SUMMARY
+          echo "2. 🧪 **Integration Tests** (Testcontainers)" >> $GITHUB_STEP_SUMMARY
+          echo "3. 🐳 **Docker Build & Push**" >> $GITHUB_STEP_SUMMARY
+          echo "4. 💨 **Smoke Tests** (Testcontainers Cloud)" >> $GITHUB_STEP_SUMMARY
+          echo "5. 🔒 **Security Scanning** (OWASP + CodeQL)" >> $GITHUB_STEP_SUMMARY
+          echo "6. 🚀 **Production Deploy** (on version tags)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+  
+  #######################################
+  # MAIN BUILD JOB
+  #######################################
   build:
+    name: 🏗️ Execute CI/CD Pipeline
+    needs: workflow-start
     uses: ./.github/workflows/ci-cd.yml
     # ✅ CRITICAL FIX: Explicitly inherit permissions to reusable workflow
     # Without this, the reusable workflow will have default read-only permissions
@@ -27,7 +104,7 @@ jobs:
       contents: write
       checks: write
       pull-requests: write
-      issues: write          # CRITICAL: This is what was missing!
+      issues: write          # CRITICAL: This enables PR comments!
       security-events: write
     with:
       java-version: "17"
@@ -35,8 +112,160 @@ jobs:
       run-tests: true
       enable-security-scan: ${{ github.event_name == 'push' }}
       event-name: ${{ github.event_name }}
+      debug-mode: false  # Set to true for verbose logging
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
+  
+  #######################################
+  # WORKFLOW COMPLETION
+  #######################################
+  workflow-complete:
+    name: 🎬 Workflow Completion
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    
+    steps:
+      - name: 📊 Print Completion Banner
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            echo "  ╔═══════════════════════════════════════════════════════╗"
+            echo "  ║                                                       ║"
+            echo "  ║         ✅  WORKFLOW COMPLETED SUCCESSFULLY  ✅      ║"
+            echo "  ║                                                       ║"
+            echo "  ╚═══════════════════════════════════════════════════════╝"
+          elif [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "  ╔═══════════════════════════════════════════════════════╗"
+            echo "  ║                                                       ║"
+            echo "  ║            ❌  WORKFLOW FAILED  ❌                   ║"
+            echo "  ║                                                       ║"
+            echo "  ╚═══════════════════════════════════════════════════════╝"
+          elif [ "${{ needs.build.result }}" == "cancelled" ]; then
+            echo "  ╔═══════════════════════════════════════════════════════╗"
+            echo "  ║                                                       ║"
+            echo "  ║          ⚠️   WORKFLOW CANCELLED  ⚠️                 ║"
+            echo "  ║                                                       ║"
+            echo "  ╚═══════════════════════════════════════════════════════╝"
+          else
+            echo "  ╔═══════════════════════════════════════════════════════╗"
+            echo "  ║                                                       ║"
+            echo "  ║          ⏭️   WORKFLOW SKIPPED  ⏭️                   ║"
+            echo "  ║                                                       ║"
+            echo "  ╚═══════════════════════════════════════════════════════╝"
+          fi
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📊 Build Result:      ${{ needs.build.result }}"
+          echo "⏰ Completed at:      $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "🔢 Run Number:        #${{ github.run_number }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+      
+      - name: 📈 Create Final Summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "║              🏁 WORKFLOW EXECUTION COMPLETED                  ║" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚════════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            echo "## ✅ WORKFLOW SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "  ╔════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║     🎉 ALL STAGES COMPLETED! 🎉       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    The pipeline executed successfully  ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ╚════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "## ❌ WORKFLOW FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "  ╔════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║        ⚠️  PIPELINE FAILED  ⚠️        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    Please review the logs above        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ╚════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.build.result }}" == "cancelled" ]; then
+            echo "## ⚠️ WORKFLOW CANCELLED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The workflow was cancelled before completion." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⏭️ WORKFLOW SKIPPED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The workflow was skipped." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📋 Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎯 Final Status | **${{ needs.build.result }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔢 Run Number | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Repository | \`${{ github.repository }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔀 Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Triggered By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Completed At | $(date '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build.result }}" == "success" ]; then
+            echo "### 🎯 Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Review test results in the checks tab" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Check artifacts for reports and builds" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Review security scan results" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              echo "- ✅ Docker image is ready for deployment" >> $GITHUB_STEP_SUMMARY
+            fi
+          elif [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "### 🔍 Troubleshooting" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "1. Check the failed job logs above" >> $GITHUB_STEP_SUMMARY
+            echo "2. Review test failure reports in artifacts" >> $GITHUB_STEP_SUMMARY
+            echo "3. Check for compilation or dependency errors" >> $GITHUB_STEP_SUMMARY
+            echo "4. Verify all required secrets are configured" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Thank you for using the CI/CD Pipeline! 🚀_" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 🔔 Notify on Failure
+        if: failure() && needs.build.result == 'failure'
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "  ⚠️  ATTENTION: Pipeline Failed"
+          echo ""
+          echo "  Please check the logs and fix the issues."
+          echo "  Run number: #${{ github.run_number }}"
+          echo "  Branch: ${{ github.ref_name }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
