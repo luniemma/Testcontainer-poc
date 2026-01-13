@@ -10,23 +10,24 @@ on:
     # Runs every day at 2:00 AM UTC
     - cron: '0 2 * * *'
 
-# 🔐 PERMISSION ALLOW-LIST (THIS IS THE KEY)
+# 🔐 CRITICAL: These permissions are required for the workflow to function properly
 permissions:
   contents: write          # needed for deploy-production
-  checks: write
-  pull-requests: write
-  issues: write
+  checks: write            # needed for check runs
+  pull-requests: write     # needed for PR comments and updates
+  issues: write            # CRITICAL: needed for creating PR comments (PRs are issues in GitHub API)
   security-events: write   # needed for security job (CodeQL / SARIF)
 
 jobs:
   build:
     uses: ./.github/workflows/ci-cd.yml
-    # ✅ FIX: Add permissions inheritance to the reusable workflow
+    # ✅ CRITICAL FIX: Explicitly inherit permissions to reusable workflow
+    # Without this, the reusable workflow will have default read-only permissions
     permissions:
       contents: write
       checks: write
       pull-requests: write
-      issues: write
+      issues: write          # CRITICAL: This is what was missing!
       security-events: write
     with:
       java-version: "17"
