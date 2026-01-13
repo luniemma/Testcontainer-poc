@@ -619,6 +619,51 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
+      # ✅ CRITICAL FIX: Login to Docker Hub FIRST (before TC Cloud setup)
+      - name: 🐳 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME || github.actor }}
+          password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      # ✅ NEW: Pre-pull Ryuk image to avoid runtime pull issues
+      - name: 📥 Pre-pull Ryuk Image
+        run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃           📥 Pre-pulling Testcontainers Images            ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          echo "🔄 Pulling Ryuk cleanup container..."
+          docker pull testcontainers/ryuk:0.5.1
+          echo "✅ Ryuk image ready"
+          echo ""
+
+      # ✅ NEW: Verify Docker setup
+      - name: 🔍 Verify Docker Setup
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "            🐳 Docker Configuration Check"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          
+          echo "📋 Docker Version:"
+          docker version --format '{{.Server.Version}}'
+          echo ""
+          
+          echo "🔐 Authentication Status:"
+          if docker info 2>/dev/null | grep -q "Username:"; then
+            echo "✅ Authenticated to Docker Hub"
+          else
+            echo "⚠️  Not authenticated (may hit rate limits)"
+          fi
+          echo ""
+          
+          echo "📦 Pre-pulled Images:"
+          docker images testcontainers/ryuk:0.5.1
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+
       - name: 🔍 Check Testcontainers Cloud Token
         id: check-token
         env:
@@ -676,14 +721,6 @@ jobs:
           distribution: "temurin"
           cache: "maven"
 
-      - name: 🐳 Login to Docker
-        if: steps.check-token.outputs.has-token == 'true'
-        uses: docker/login-action@v3
-        with:
-          registry: "docker.io"
-          username: ${{ secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
-
       - name: ⚙️ Configure Testcontainers Cloud
         if: steps.check-token.outputs.has-token == 'true'
         uses: atomicjar/testcontainers-cloud-setup-action@v1
@@ -694,18 +731,39 @@ jobs:
       - name: 💨 Run Smoke Tests
         if: steps.check-token.outputs.has-token == 'true'
         env:
+          # Testcontainers Cloud
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
-          IMAGE_TAG: ${{ steps.get-tag.outputs.image-tag }}
           TESTCONTAINERS_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
-          TESTCONTAINERS_REUSE_ENABLE: false
+          
+          # Docker configuration
           DOCKER_HOST: unix:///var/run/docker.sock
+          
+          # ✅ Ryuk configuration (cleanup container)
+          TESTCONTAINERS_RYUK_DISABLED: false
+          TESTCONTAINERS_RYUK_CONTAINER_TIMEOUT: 60s
+          TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: false
+          
+          # ✅ Image pull configuration
+          TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: ""
+          
+          # Test configuration
+          IMAGE_TAG: ${{ steps.get-tag.outputs.image-tag }}
+          TESTCONTAINERS_REUSE_ENABLE: false
         run: |
           echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
           echo "┃              💨 Running Smoke Tests                        ┃"
           echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
           echo ""
           echo "🐳 Image: $IMAGE_TAG"
+          echo "🌩️  Platform: Testcontainers Cloud"
           echo "⏰ Started at: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          
+          # ✅ Show environment for debugging
+          echo "📋 Test Environment:"
+          echo "  • TESTCONTAINERS_CLOUD_TOKEN: ${TESTCONTAINERS_CLOUD_TOKEN:+SET}"
+          echo "  • DOCKER_HOST: $DOCKER_HOST"
+          echo "  • TESTCONTAINERS_RYUK_DISABLED: $TESTCONTAINERS_RYUK_DISABLED"
           echo ""
           
           MAX_ATTEMPTS=3

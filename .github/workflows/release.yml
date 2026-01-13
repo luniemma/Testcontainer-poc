@@ -272,10 +272,18 @@ jobs:
             echo "✅ Initial release changelog created"
           fi
           
-          # Save for release notes
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat changelog.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # ✅ FIX: Use unique delimiter to avoid conflicts with commit messages
+          # Using timestamp ensures the delimiter won't appear in any commit message
+          DELIMITER="CHANGELOG_END_$(date +%s%N)"
+          
+          {
+            echo "changelog<<${DELIMITER}"
+            cat changelog.txt
+            echo "${DELIMITER}"
+          } >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "✅ Changelog saved to output"
       
       - name: 📦 Download Build Artifacts (if available)
         continue-on-error: true
