@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: testcontainers-demo-test
+
+logging:
+  level:
+    root: INFO
+    com.example.testcontainers: DEBUG
+    org.testcontainers: DEBUG
+    com.github.dockerjava: DEBUG
+
+external:
+  redis:
+    url: ${EXTERNAL_REDIS_URL:}
+  kafka:
+    url: ${EXTERNAL_KAFKA_URL:}
+  cassandra:
+    url: ${EXTERNAL_CASSANDRA_URL:}
+  api:
+    health-check-url: ${EXTERNAL_API_HEALTH_CHECK_URL:}

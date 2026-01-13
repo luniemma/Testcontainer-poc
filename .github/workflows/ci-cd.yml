@@ -40,9 +40,12 @@ on:
       image-tag:
         value: ${{ jobs.docker.outputs.image-tag }}
 
+# ✅ FIXED: Added missing permissions for PR comments
 permissions:
   contents: read
   checks: write
+  pull-requests: write  # Required for PR comments and updates
+  issues: write         # CRITICAL: Required for publish-unit-test-result-action to create PR comments
 
 env:
   REGISTRY: docker.io
