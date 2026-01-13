@@ -1,4 +1,4 @@
-name: Release Pipeline
+name: 🎉 Release Pipeline
 
 on:
   push:
@@ -8,22 +8,563 @@ on:
 permissions:
   contents: write         # For creating releases and checking out code
   checks: write           # For publishing test results
+  pull-requests: write    # For PR-related operations
+  issues: write           # CRITICAL: For creating comments (PRs are issues in GitHub API)
   security-events: write  # For security scanning (CodeQL/OWASP)
   actions: read           # For downloading artifacts
   packages: write         # For pushing Docker images (if using GHCR)
 
 jobs:
+  
+  #######################################
+  # PRE-RELEASE VALIDATION
+  #######################################
+  pre-release:
+    name: 🔍 Pre-Release Validation
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      is-prerelease: ${{ steps.check.outputs.is-prerelease }}
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for changelog
+      
+      - name: 🎯 Print Release Information
+        run: |
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║                                                                ║"
+          echo "║              🎉 RELEASE PIPELINE STARTING 🎉                  ║"
+          echo "║                                                                ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "┌────────────────────────────────────────────────────────────────┐"
+          echo "│                    RELEASE INFORMATION                         │"
+          echo "└────────────────────────────────────────────────────────────────┘"
+          echo ""
+          echo "🏷️  Tag:              ${{ github.ref_name }}"
+          echo "📦 Repository:        ${{ github.repository }}"
+          echo "📝 Commit SHA:        ${{ github.sha }}"
+          echo "👤 Triggered by:      ${{ github.actor }}"
+          echo "⏰ Started at:        $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+      
+      - name: 🔍 Extract Version Information
+        id: extract
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"  # Remove 'v' prefix
+          
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              🔍 Version Analysis                           ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          echo "📌 Full Tag:          $TAG"
+          echo "📌 Version:           $VERSION"
+          echo ""
+          
+          # Parse version components
+          if [[ $VERSION =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            SUFFIX="${BASH_REMATCH[4]}"
+            
+            echo "🔢 Major:             $MAJOR"
+            echo "🔢 Minor:             $MINOR"
+            echo "🔢 Patch:             $PATCH"
+            
+            if [ -n "$SUFFIX" ]; then
+              echo "🏷️  Suffix:           $SUFFIX"
+            fi
+            
+            echo ""
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "major=$MAJOR" >> $GITHUB_OUTPUT
+            echo "minor=$MINOR" >> $GITHUB_OUTPUT
+            echo "patch=$PATCH" >> $GITHUB_OUTPUT
+            echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
+            
+            echo "✅ Version parsed successfully"
+          else
+            echo "❌ ERROR: Invalid version format: $VERSION"
+            echo "Expected format: X.Y.Z or X.Y.Z-suffix"
+            exit 1
+          fi
+      
+      - name: 🏷️ Check Release Type
+        id: check
+        run: |
+          VERSION="${{ steps.extract.outputs.version }}"
+          SUFFIX="${{ steps.extract.outputs.suffix }}"
+          
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              🏷️  Release Type Detection                   ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          
+          if [ -n "$SUFFIX" ]; then
+            if [[ $SUFFIX =~ ^-(alpha|beta|rc) ]]; then
+              echo "🎯 Release Type:      Pre-release"
+              echo "📌 Stage:             $SUFFIX"
+              echo "is-prerelease=true" >> $GITHUB_OUTPUT
+              RELEASE_TYPE="Pre-release"
+            else
+              echo "🎯 Release Type:      Release (with suffix)"
+              echo "📌 Suffix:            $SUFFIX"
+              echo "is-prerelease=false" >> $GITHUB_OUTPUT
+              RELEASE_TYPE="Release"
+            fi
+          else
+            echo "🎯 Release Type:      Production Release"
+            echo "📌 Stage:             Stable"
+            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+            RELEASE_TYPE="Production"
+          fi
+          
+          echo ""
+          echo "✅ Release type identified: $RELEASE_TYPE"
+      
+      - name: 📊 Create Pre-Release Summary
+        run: |
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                              ║" >> $GITHUB_STEP_SUMMARY
+          echo "║              🎉 RELEASE PIPELINE INITIATED                  ║" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                              ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏷️ Release Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏷️ Tag | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📌 Version | **${{ steps.extract.outputs.version }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔢 Major | ${{ steps.extract.outputs.major }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔢 Minor | ${{ steps.extract.outputs.minor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔢 Patch | ${{ steps.extract.outputs.patch }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "${{ steps.extract.outputs.suffix }}" ]; then
+            echo "| 🏷️ Suffix | \`${{ steps.extract.outputs.suffix }}\` |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ steps.check.outputs.is-prerelease }}" == "true" ]; then
+            echo "| 🎯 Type | **Pre-release** ⚠️ |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🎯 Type | **Production Release** ✅ |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "| 👤 Released By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Started | $(date '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🚀 Release Stages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The following stages will be executed:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. ✅ **Pre-Release Validation** (Current)" >> $GITHUB_STEP_SUMMARY
+          echo "2. 🏗️ **Build & Test** → Full CI/CD pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "3. 📝 **Create GitHub Release** → Generate release notes" >> $GITHUB_STEP_SUMMARY
+          echo "4. 🎉 **Post-Release** → Cleanup and notifications" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+
+  #######################################
+  # MAIN RELEASE BUILD
+  #######################################
   release:
+    name: 🏗️ Build & Test Release
+    needs: pre-release
     uses: ./.github/workflows/ci-cd.yml
+    # ✅ Explicitly pass permissions to reusable workflow
+    permissions:
+      contents: write
+      checks: write
+      pull-requests: write
+      issues: write          # CRITICAL: For creating comments
+      security-events: write
     with:
       java-version: "17"
       docker-platforms: "linux/amd64,linux/arm64"
       run-tests: true
       enable-security-scan: true
-      sonar-token: ""                    # 🔥 NEVER put secrets here
+      sonar-token: ""        # 🔥 NEVER put secrets here
       event-name: ${{ github.event_name }}
+      debug-mode: false
     secrets:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
+
+
+  #######################################
+  # CREATE GITHUB RELEASE
+  #######################################
+  create-release:
+    name: 📝 Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [pre-release, release]
+    if: always() && !cancelled() && needs.release.result == 'success'
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for changelog
+      
+      - name: 🎯 Print Release Creation Info
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "           📝  CREATING GITHUB RELEASE"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "🏷️  Version:          ${{ needs.pre-release.outputs.version }}"
+          echo "🎯 Type:              ${{ needs.pre-release.outputs.is-prerelease == 'true' && 'Pre-release' || 'Production' }}"
+          echo "🐳 Docker Image:      ${{ needs.release.outputs.image-tag }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+      
+      - name: 📋 Generate Changelog
+        id: changelog
+        run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              📋 Generating Changelog                       ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "📌 Previous Tag:      $PREV_TAG"
+            echo "📌 Current Tag:       ${{ github.ref_name }}"
+            echo ""
+            echo "🔍 Commits since $PREV_TAG:"
+            echo ""
+            
+            # Generate changelog
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges > changelog.txt
+            
+            if [ -s changelog.txt ]; then
+              cat changelog.txt
+              echo ""
+              echo ""
+              echo "✅ Changelog generated with $(wc -l < changelog.txt) commits"
+            else
+              echo "- Initial release" > changelog.txt
+              echo "✅ No previous commits (initial release)"
+            fi
+          else
+            echo "📌 No previous tag found"
+            echo "📝 Creating initial release changelog"
+            echo ""
+            echo "- Initial release" > changelog.txt
+            echo "✅ Initial release changelog created"
+          fi
+          
+          # Save for release notes
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat changelog.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: 📦 Download Build Artifacts (if available)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: application-jar
+          path: ./artifacts
+      
+      - name: 📝 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Release ${{ needs.pre-release.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          prerelease: ${{ needs.pre-release.outputs.is-prerelease == 'true' }}
+          generate_release_notes: true
+          body: |
+            ## 🎉 Release ${{ needs.pre-release.outputs.version }}
+            
+            **Release Type:** ${{ needs.pre-release.outputs.is-prerelease == 'true' && '⚠️ Pre-release' || '✅ Production Release' }}
+            
+            ### 📦 Artifacts
+            
+            **Docker Image:**
+            ```bash
+            docker pull ${{ needs.release.outputs.image-tag }}
+            ```
+            
+            ### 📋 Changes in this Release
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### 🔒 Security
+            
+            - ✅ All security scans passed
+            - ✅ OWASP dependency check completed
+            - ✅ CodeQL analysis completed
+            
+            ### 🧪 Testing
+            
+            - ✅ All unit tests passed
+            - ✅ All integration tests passed
+            - ✅ Smoke tests completed successfully
+            
+            ---
+            
+            **Released by:** @${{ github.actor }}
+            **Release date:** $(date '+%Y-%m-%d %H:%M:%S UTC')
+          files: |
+            ./artifacts/*.jar
+      
+      - name: ✅ Release Created Successfully
+        run: |
+          echo "┌─────────────────────────────────────────────────────────────┐"
+          echo "│          ✅ GitHub Release Created Successfully            │"
+          echo "└─────────────────────────────────────────────────────────────┘"
+          echo ""
+          echo "🏷️  Version:          ${{ needs.pre-release.outputs.version }}"
+          echo "🔗 Release URL:       ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          echo ""
+      
+      - name: 📊 Create Release Summary
+        run: |
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                              ║" >> $GITHUB_STEP_SUMMARY
+          echo "║              📝 GITHUB RELEASE CREATED                      ║" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                              ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Release Created Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏷️ Version | **${{ needs.pre-release.outputs.version }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎯 Type | ${{ needs.pre-release.outputs.is-prerelease == 'true' && '⚠️ Pre-release' || '✅ Production' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🐳 Docker Image | \`${{ needs.release.outputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Released By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Created At | $(date '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 [View Release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }})" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐳 Docker: \`docker pull ${{ needs.release.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🎯 Deployment Command" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Pull the Docker image" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ needs.release.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Run the container" >> $GITHUB_STEP_SUMMARY
+          echo "docker run -p 8080:8080 ${{ needs.release.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+
+  #######################################
+  # POST-RELEASE TASKS
+  #######################################
+  post-release:
+    name: 🎉 Post-Release Tasks
+    runs-on: ubuntu-latest
+    needs: [pre-release, release, create-release]
+    if: always()
+    
+    steps:
+      - name: 📊 Print Final Status
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "           🎉  RELEASE PIPELINE COMPLETED"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          
+          echo "📋 Pipeline Results:"
+          echo "  • Pre-Release:      ${{ needs.pre-release.result }}"
+          echo "  • Build & Test:     ${{ needs.release.result }}"
+          echo "  • Create Release:   ${{ needs.create-release.result }}"
+          echo ""
+          
+          if [ "${{ needs.create-release.result }}" == "success" ]; then
+            echo "╔═══════════════════════════════════════════════════════════╗"
+            echo "║                                                           ║"
+            echo "║        🎉 RELEASE PUBLISHED SUCCESSFULLY! 🎉             ║"
+            echo "║                                                           ║"
+            echo "╚═══════════════════════════════════════════════════════════╝"
+          else
+            echo "╔═══════════════════════════════════════════════════════════╗"
+            echo "║                                                           ║"
+            echo "║           ⚠️  RELEASE PIPELINE FAILED  ⚠️               ║"
+            echo "║                                                           ║"
+            echo "╚═══════════════════════════════════════════════════════════╝"
+          fi
+          
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+      
+      - name: 📈 Create Final Summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "║              🏁 RELEASE PIPELINE COMPLETED                    ║" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚════════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [ "${{ needs.create-release.result }}" == "success" ]; then
+            echo "## 🎉 RELEASE SUCCESSFUL!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "  ╔═══════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                                   ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║     🚀 VERSION ${{ needs.pre-release.outputs.version }} RELEASED! 🚀        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                                   ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    ✅ Built                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    ✅ Tested                                      ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    ✅ Secured                                     ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    ✅ Published                                   ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                                   ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ╚═══════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ RELEASE FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "  ╔═══════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                                   ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║        ⚠️  RELEASE PIPELINE FAILED  ⚠️           ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                                   ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║      Please review the logs above                 ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                                   ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ╚═══════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Pipeline stages summary
+          echo "### 📋 Pipeline Stages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.pre-release.result }}" == "success" ]; then
+            echo "| 🔍 Pre-Release Validation | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔍 Pre-Release Validation | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.release.result }}" == "success" ]; then
+            echo "| 🏗️ Build & Test | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🏗️ Build & Test | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.create-release.result }}" == "success" ]; then
+            echo "| 📝 Create Release | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.create-release.result }}" == "skipped" ]; then
+            echo "| 📝 Create Release | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 📝 Create Release | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Release information (if successful)
+          if [ "${{ needs.create-release.result }}" == "success" ]; then
+            echo "### 🎯 Release Details" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| 🏷️ Version | **${{ needs.pre-release.outputs.version }}** |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎯 Type | ${{ needs.pre-release.outputs.is-prerelease == 'true' && '⚠️ Pre-release' || '✅ Production' }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🐳 Docker Image | \`${{ needs.release.outputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| 👤 Released By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⏰ Completed At | $(date '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "### 🚀 Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "1. 📦 [View the release](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }})" >> $GITHUB_STEP_SUMMARY
+            echo "2. 🐳 Pull the Docker image: \`docker pull ${{ needs.release.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "3. 📝 Update deployment documentation" >> $GITHUB_STEP_SUMMARY
+            echo "4. 🔔 Notify stakeholders of the new release" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ needs.pre-release.outputs.is-prerelease }}" == "true" ]; then
+              echo "5. ⚠️ **Note**: This is a pre-release - test thoroughly before production deployment" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "5. ✅ Deploy to production environment" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### 🔍 Troubleshooting" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "1. Check the failed job logs above" >> $GITHUB_STEP_SUMMARY
+            echo "2. Verify version tag format (v*.*.* )" >> $GITHUB_STEP_SUMMARY
+            echo "3. Ensure all tests pass locally" >> $GITHUB_STEP_SUMMARY
+            echo "4. Check that all secrets are configured" >> $GITHUB_STEP_SUMMARY
+            echo "5. Review security scan results" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Release pipeline completed at $(date '+%Y-%m-%d %H:%M:%S UTC')_ 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 🔔 Notify on Release
+        if: needs.create-release.result == 'success'
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "  🎉 RELEASE NOTIFICATION"
+          echo ""
+          echo "  Version ${{ needs.pre-release.outputs.version }} has been successfully released!"
+          echo ""
+          echo "  🔗 View release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+      
+      - name: ⚠️ Notify on Failure
+        if: needs.create-release.result == 'failure'
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "  ⚠️ RELEASE FAILED"
+          echo ""
+          echo "  The release pipeline for version ${{ needs.pre-release.outputs.version }} has failed."
+          echo "  Please review the logs and fix the issues."
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
