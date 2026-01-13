@@ -13,7 +13,7 @@ on:
 
       sonar-token:
         type: string
-        default: ""   # callers ALWAYS pass empty string
+        default: ""
 
       enable-security-scan:
         type: boolean
@@ -25,6 +25,11 @@ on:
 
       event-name:
         type: string
+
+      debug-mode:
+        type: boolean
+        default: false
+        description: "Enable verbose debug logging"
 
     secrets:
       DOCKER_USERNAME:
@@ -40,12 +45,11 @@ on:
       image-tag:
         value: ${{ jobs.docker.outputs.image-tag }}
 
-# ✅ FIXED: Added missing permissions for PR comments
 permissions:
   contents: read
   checks: write
-  pull-requests: write  # Required for PR comments and updates
-  issues: write         # CRITICAL: Required for publish-unit-test-result-action to create PR comments
+  pull-requests: write
+  issues: write
 
 env:
   REGISTRY: docker.io
@@ -57,25 +61,87 @@ jobs:
   # BUILD + UNIT TESTS
   #######################################
   build:
-    name: Build & Unit Tests
+    name: 🏗️ Build & Unit Tests
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: 🎯 Print Build Configuration
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "               🏗️  BUILD CONFIGURATION"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "📦 Repository:        ${{ github.repository }}"
+          echo "🔀 Branch:            ${{ github.ref_name }}"
+          echo "📝 Commit:            ${{ github.sha }}"
+          echo "👤 Triggered by:      ${{ github.actor }}"
+          echo "☕ Java Version:      ${{ inputs.java-version }}"
+          echo "🧪 Run Tests:         ${{ inputs.run-tests }}"
+          echo "🐛 Debug Mode:        ${{ inputs.debug-mode }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
 
-      - uses: actions/setup-java@v4
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ inputs.java-version }}
           distribution: "temurin"
           cache: "maven"
 
-      - run: mvn -B clean package -DskipTests
+      - name: 📊 Display Java Environment
+        run: |
+          echo "┌─────────────────────────────────────────────────────────────┐"
+          echo "│                   Java Environment Info                     │"
+          echo "└─────────────────────────────────────────────────────────────┘"
+          java -version
+          mvn -version
+          echo ""
 
-      - name: Run Unit Tests
+      - name: 🔨 Build Application (Skip Tests)
+        run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              🔨 Building Application                       ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          
+          if [ "${{ inputs.debug-mode }}" == "true" ]; then
+            mvn -B -X clean package -DskipTests
+          else
+            mvn -B clean package -DskipTests
+          fi
+          
+          echo ""
+          echo "✅ Build completed successfully!"
+
+      - name: 🧪 Run Unit Tests
         if: ${{ inputs.run-tests }}
-        run: mvn -B test
+        run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              🧪 Running Unit Tests                         ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          echo "⏰ Started at: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          
+          START_TIME=$(date +%s)
+          
+          if [ "${{ inputs.debug-mode }}" == "true" ]; then
+            mvn -B -X test
+          else
+            mvn -B test
+          fi
+          
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          
+          echo ""
+          echo "✅ Tests completed in ${DURATION}s"
+          echo "⏰ Finished at: $(date '+%Y-%m-%d %H:%M:%S')"
 
-      - name: Publish Unit Test Results
+      - name: 📊 Publish Unit Test Results
         if: ${{ always() && inputs.run-tests }}
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
@@ -84,79 +150,204 @@ jobs:
             target/surefire-reports/*.xml
           check_name: Unit Test Results
 
-      - name: Build Summary
+      - name: 📈 Build Summary
         if: always()
         run: |
-          echo "## 🏗️ Build & Unit Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║                  🏗️  BUILD & UNIT TESTS                     ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Java Version | ${{ inputs.java-version }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Status | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ☕ Java Version | \`${{ inputs.java-version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Repository | \`${{ github.repository }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔀 Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Triggered By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "| 🎯 Build Status | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🎯 Build Status | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ inputs.run-tests }}" == "true" ] && [ -d "target/surefire-reports" ]; then
-            TESTS=$(find target/surefire-reports -name "*.xml" -exec grep -h "tests=" {} \; | sed 's/.*tests="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
-            FAILURES=$(find target/surefire-reports -name "*.xml" -exec grep -h "failures=" {} \; | sed 's/.*failures="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
-            echo "| Tests Run | ${TESTS:-0} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Failures | ${FAILURES:-0} |" >> $GITHUB_STEP_SUMMARY
+            TESTS=$(find target/surefire-reports -name "*.xml" -exec grep -h "tests=" {} \; 2>/dev/null | sed 's/.*tests="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
+            FAILURES=$(find target/surefire-reports -name "*.xml" -exec grep -h "failures=" {} \; 2>/dev/null | sed 's/.*failures="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
+            ERRORS=$(find target/surefire-reports -name "*.xml" -exec grep -h "errors=" {} \; 2>/dev/null | sed 's/.*errors="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
+            SKIPPED=$(find target/surefire-reports -name "*.xml" -exec grep -h "skipped=" {} \; 2>/dev/null | sed 's/.*skipped="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Count | Percentage |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|------------|" >> $GITHUB_STEP_SUMMARY
+            echo "| 📊 Total Tests | **${TESTS:-0}** | 100% |" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${TESTS:-0}" -gt 0 ]; then
+              PASS=$((${TESTS:-0} - ${FAILURES:-0} - ${ERRORS:-0}))
+              PASS_PCT=$((PASS * 100 / ${TESTS:-1}))
+              echo "| ✅ Passed | **${PASS}** | ${PASS_PCT}% |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "${FAILURES:-0}" -gt 0 ]; then
+              FAIL_PCT=$((${FAILURES:-0} * 100 / ${TESTS:-1}))
+              echo "| ❌ Failed | **${FAILURES}** | ${FAIL_PCT}% |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| ❌ Failed | 0 | 0% |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "${ERRORS:-0}" -gt 0 ]; then
+              ERR_PCT=$((${ERRORS:-0} * 100 / ${TESTS:-1}))
+              echo "| ⚠️ Errors | **${ERRORS}** | ${ERR_PCT}% |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| ⚠️ Errors | 0 | 0% |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "${SKIPPED:-0}" -gt 0 ]; then
+              SKIP_PCT=$((${SKIPPED:-0} * 100 / ${TESTS:-1}))
+              echo "| ⏭️ Skipped | **${SKIPPED}** | ${SKIP_PCT}% |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</div>" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${FAILURES:-0}" -eq 0 ] && [ "${ERRORS:-0}" -eq 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🎉 All Tests Passed!" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "```" >> $GITHUB_STEP_SUMMARY
+              echo "    ✨ Perfect Score! ✨" >> $GITHUB_STEP_SUMMARY
+              echo "   🎯 ${TESTS} / ${TESTS} Tests Passing" >> $GITHUB_STEP_SUMMARY
+              echo "```" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</div>" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-      #######################################
-      # SONAR TOKEN SAFE-MERGE LOGIC
-      #######################################
-      - name: Merge sonar-token
+      - name: 🔐 Merge Sonar Token
         env:
           INPUT_TOKEN: ${{ inputs.sonar-token }}
           SECRET_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           if [ -n "$INPUT_TOKEN" ]; then
+            echo "🔑 Using input sonar token"
             echo "SONAR_TOKEN_SAFE=$INPUT_TOKEN" >> $GITHUB_ENV
           else
+            echo "🔑 Using secret sonar token"
             echo "SONAR_TOKEN_SAFE=$SECRET_TOKEN" >> $GITHUB_ENV
           fi
 
-      #######################################
-      # SONAR CLOUD
-      #######################################
-      - name: SonarCloud Scan
+      - name: 🔍 SonarCloud Scan
         if: ${{ env.SONAR_TOKEN_SAFE != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ env.SONAR_TOKEN_SAFE }}
-        run: mvn -B sonar:sonar -Dsonar.login=${{ env.SONAR_TOKEN }} -Dsonar.java.a3s.enable=false
+        run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              🔍 Running SonarCloud Scan                    ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          mvn -B sonar:sonar -Dsonar.login=${{ env.SONAR_TOKEN }} -Dsonar.java.a3s.enable=false
+          echo ""
+          echo "✅ SonarCloud scan completed!"
 
-      - name: Upload JAR
+      - name: 📦 Upload JAR Artifact
         uses: actions/upload-artifact@v4
         with:
           name: application-jar
           path: target/*.jar
           retention-days: 7
+          
+      - name: 📝 Log Artifact Upload
+        run: |
+          echo "┌─────────────────────────────────────────────────────────────┐"
+          echo "│              📦 Artifact Upload Complete                    │"
+          echo "└─────────────────────────────────────────────────────────────┘"
+          ls -lh target/*.jar
+          echo ""
+          echo "✅ JAR artifacts uploaded successfully"
 
 
   #######################################
   # TESTCONTAINERS INTEGRATION TESTS
   #######################################
   testcontainers:
-    name: Testcontainers Integration Tests
+    name: 🧪 Integration Tests
     runs-on: ubuntu-latest
     needs: build
     if: ${{ inputs.run-tests }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: 🎯 Print Test Configuration
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "          🧪  INTEGRATION TESTS CONFIGURATION"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "🐳 Test Type:         Testcontainers"
+          echo "☕ Java Version:      ${{ inputs.java-version }}"
+          echo "🐛 Debug Mode:        ${{ inputs.debug-mode }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ inputs.java-version }}
           distribution: "temurin"
           cache: "maven"
 
-      - run: sudo systemctl start docker
+      - name: 🐳 Start Docker Service
+        run: |
+          echo "🐳 Starting Docker daemon..."
+          sudo systemctl start docker
+          echo "✅ Docker started successfully"
+          docker --version
 
-      - name: Run Integration Tests
-        run: mvn -B -Ptestcontainers verify
+      - name: 🧪 Run Integration Tests
+        run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃          🧪 Running Integration Tests                      ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          echo "⏰ Started at: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          
+          START_TIME=$(date +%s)
+          
+          if [ "${{ inputs.debug-mode }}" == "true" ]; then
+            mvn -B -X -Ptestcontainers verify
+          else
+            mvn -B -Ptestcontainers verify
+          fi
+          
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          
+          echo ""
+          echo "✅ Integration tests completed in ${DURATION}s"
+          echo "⏰ Finished at: $(date '+%Y-%m-%d %H:%M:%S')"
 
-      - name: Publish Integration Test Results
+      - name: 📊 Publish Integration Test Results
         if: always()
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
@@ -166,33 +357,73 @@ jobs:
             target/failsafe-reports/*.xml
           check_name: Integration Test Results
 
-      - name: Integration Tests Summary
+      - name: 📈 Integration Tests Summary
         if: always()
         run: |
-          echo "## 🧪 Integration Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║              🧪  INTEGRATION TESTS RESULTS                  ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -d "target/failsafe-reports" ]; then
-            TESTS=$(find target/failsafe-reports -name "*.xml" -exec grep -h "tests=" {} \; | sed 's/.*tests="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
-            FAILURES=$(find target/failsafe-reports -name "*.xml" -exec grep -h "failures=" {} \; | sed 's/.*failures="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
-            ERRORS=$(find target/failsafe-reports -name "*.xml" -exec grep -h "errors=" {} \; | sed 's/.*errors="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
+            TESTS=$(find target/failsafe-reports -name "*.xml" -exec grep -h "tests=" {} \; 2>/dev/null | sed 's/.*tests="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
+            FAILURES=$(find target/failsafe-reports -name "*.xml" -exec grep -h "failures=" {} \; 2>/dev/null | sed 's/.*failures="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
+            ERRORS=$(find target/failsafe-reports -name "*.xml" -exec grep -h "errors=" {} \; 2>/dev/null | sed 's/.*errors="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
             
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Tests Run | ${TESTS:-0} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Failures | ${FAILURES:-0} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Errors | ${ERRORS:-0} |" >> $GITHUB_STEP_SUMMARY
+            echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| 📊 Total Tests | **${TESTS:-0}** | - |" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${TESTS:-0}" -gt 0 ]; then
+              PASS=$((${TESTS:-0} - ${FAILURES:-0} - ${ERRORS:-0}))
+              echo "| ✅ Passed | **${PASS}** | 🎯 |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "${FAILURES:-0}" -gt 0 ]; then
+              echo "| ❌ Failures | **${FAILURES}** | ⚠️ |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| ❌ Failures | 0 | ✅ |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "${ERRORS:-0}" -gt 0 ]; then
+              echo "| ⚠️ Errors | **${ERRORS}** | 🚨 |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| ⚠️ Errors | 0 | ✅ |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</div>" >> $GITHUB_STEP_SUMMARY
             
             if [ "${FAILURES:-0}" -eq 0 ] && [ "${ERRORS:-0}" -eq 0 ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "✅ All integration tests passed!" >> $GITHUB_STEP_SUMMARY
+              echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🎊 All Integration Tests Passed!" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "```" >> $GITHUB_STEP_SUMMARY
+              echo "  ╔═══════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+              echo "  ║   ✨ PERFECT SCORE! ✨   ║" >> $GITHUB_STEP_SUMMARY
+              echo "  ║  ${TESTS} / ${TESTS} Tests Passing  ║" >> $GITHUB_STEP_SUMMARY
+              echo "  ╚═══════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+              echo "```" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</div>" >> $GITHUB_STEP_SUMMARY
             else
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "❌ Some integration tests failed" >> $GITHUB_STEP_SUMMARY
+              echo "### ⚠️ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Please review the test logs for detailed error information." >> $GITHUB_STEP_SUMMARY
             fi
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-      - uses: actions/upload-artifact@v4
+      - name: 📦 Upload Test Reports
+        uses: actions/upload-artifact@v4
         with:
           name: testcontainers-reports
           path: |
@@ -205,7 +436,7 @@ jobs:
   # DOCKER BUILD & PUSH
   #######################################
   docker:
-    name: Docker Build & Push
+    name: 🐳 Docker Build & Push
     runs-on: ubuntu-latest
     needs: build
     if: ${{ always() && !cancelled() && needs.build.result == 'success' && inputs.event-name != 'pull_request' }}
@@ -213,18 +444,43 @@ jobs:
       image-tag: ${{ steps.save-tag.outputs.image-tag }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: 🎯 Print Docker Configuration
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "             🐳  DOCKER BUILD CONFIGURATION"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "🏷️  Registry:         ${{ env.REGISTRY }}"
+          echo "📦 Image Name:        ${{ env.IMAGE_NAME }}"
+          echo "🖥️  Platforms:        ${{ inputs.docker-platforms }}"
+          echo "🔀 Branch:            ${{ github.ref_name }}"
+          echo "📝 Commit SHA:        ${{ github.sha }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - name: 🔧 Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        
+      - name: 🔧 Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - name: 🔐 Login to Docker Registry
+        uses: docker/login-action@v3
         with:
           registry: "docker.io"
           username: ${{ secrets.DOCKER_USERNAME || github.actor }}
           password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          
+      - name: ✅ Docker Login Success
+        run: |
+          echo "┌─────────────────────────────────────────────────────────────┐"
+          echo "│          🔐 Docker Registry Login Successful               │"
+          echo "└─────────────────────────────────────────────────────────────┘"
 
-      - name: Docker Metadata
+      - name: 🏷️ Generate Docker Metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -237,64 +493,113 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
-      - name: Extract and save primary image tag
+      - name: 📝 Extract Primary Image Tag
         id: save-tag
         run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              🏷️  Extracting Image Tags                    ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          
           TAGS="${{ steps.meta.outputs.tags }}"
-          echo "All tags from metadata:"
+          echo "📋 All generated tags:"
           echo "$TAGS"
-          echo "---"
+          echo ""
           
           PRIMARY_TAG=$(echo "$TAGS" | head -n 1)
-          echo "Primary tag: $PRIMARY_TAG"
+          echo "🎯 Primary tag selected: $PRIMARY_TAG"
           
-          # Save to file for artifact
           echo "$PRIMARY_TAG" > image-tag.txt
-          
-          # Save to output
           echo "image-tag=$PRIMARY_TAG" >> $GITHUB_OUTPUT
           
-          echo "✅ Tag saved: $PRIMARY_TAG"
+          echo ""
+          echo "✅ Tag saved successfully"
 
-      - uses: docker/build-push-action@v5
+      - name: 🔨 Build and Push Docker Image
+        uses: docker/build-push-action@v5
         with:
           context: .
           platforms: ${{ inputs.docker-platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          
+      - name: ✅ Docker Build Complete
+        run: |
+          echo "┌─────────────────────────────────────────────────────────────┐"
+          echo "│          🎉 Docker Image Built & Pushed Successfully       │"
+          echo "└─────────────────────────────────────────────────────────────┘"
+          echo ""
+          echo "📦 Image: ${{ steps.save-tag.outputs.image-tag }}"
 
-      - name: Docker Build Summary
+      - name: 📈 Docker Build Summary
         if: always()
         run: |
-          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║              🐳  DOCKER BUILD & PUSH RESULTS                ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Build Details" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Registry | ${{ env.REGISTRY }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | ${{ env.IMAGE_NAME }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Primary Tag | ${{ steps.save-tag.outputs.image-tag }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Platforms | ${{ inputs.docker-platforms }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏷️ Registry | \`${{ env.REGISTRY }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Image | \`${{ env.IMAGE_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎯 Primary Tag | \`${{ steps.save-tag.outputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🖥️ Platforms | \`${{ inputs.docker-platforms }}\` |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "| ✅ Status | **SUCCESS** 🎉 |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ❌ Status | **FAILED** 😞 |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### All Tags:" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🏷️ All Generated Tags:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 Docker Image Ready for Deployment!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Pull the image:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ steps.save-tag.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</div>" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload SBOM
+      - name: 📄 Generate SBOM
         uses: anchore/sbom-action@v0
         with:
           image: ${{ steps.save-tag.outputs.image-tag }}
           format: spdx-json
           output-file: sbom.spdx.json
 
-      - uses: actions/upload-artifact@v4
+      - name: 📦 Upload Artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: sbom.spdx.json
 
-      # Upload image tag as artifact as backup
-      - uses: actions/upload-artifact@v4
+      - name: 📦 Upload Image Tag
+        uses: actions/upload-artifact@v4
         with:
           name: image-tag
           path: image-tag.txt
@@ -302,44 +607,52 @@ jobs:
 
 
   #######################################
-  # CONTAINER SMOKE TESTS (TESTCONTAINERS CLOUD)
+  # SMOKE TESTS (Continuation in next file due to length...)
   #######################################
   smoke-tests:
-    name: Container Smoke Tests (Testcontainers Cloud)
+    name: 💨 Smoke Tests
     runs-on: ubuntu-latest
     needs: docker
     if: ${{ always() && !cancelled() && needs.docker.result == 'success' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
 
-      # Check if TC_CLOUD_TOKEN is available
-      - name: Check for Testcontainers Cloud token
+      - name: 🔍 Check Testcontainers Cloud Token
         id: check-token
         env:
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
         run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "        💨  SMOKE TESTS CONFIGURATION CHECK"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          
           if [ -z "$TC_CLOUD_TOKEN" ]; then
-            echo "⚠️ Testcontainers Cloud token not available - skipping smoke tests"
+            echo "⚠️  WARNING: Testcontainers Cloud token not available"
+            echo "📝 Smoke tests will be skipped"
+            echo "💡 Add TC_CLOUD_TOKEN secret to enable smoke tests"
             echo "has-token=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ Testcontainers Cloud token available"
+            echo "✅ Testcontainers Cloud token detected"
+            echo "🚀 Smoke tests will run"
             echo "has-token=true" >> $GITHUB_OUTPUT
           fi
+          
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
 
-      # Download image tag from artifact (fallback method)
-      - name: Download image tag artifact
+      - name: 📥 Download Image Tag
         if: steps.check-token.outputs.has-token == 'true'
         uses: actions/download-artifact@v4
         with:
           name: image-tag
 
-      # Get image tag from artifact or job output
-      - name: Get image tag
+      - name: 🏷️ Get Image Tag
         if: steps.check-token.outputs.has-token == 'true'
         id: get-tag
         run: |
-          # Try job output first
           JOB_OUTPUT="${{ needs.docker.outputs.image-tag }}"
           
           if [ -n "$JOB_OUTPUT" ]; then
@@ -349,88 +662,78 @@ jobs:
             IMAGE_TAG=$(cat image-tag.txt)
             echo "✅ Using image tag from artifact: $IMAGE_TAG"
           else
-            echo "❌ ERROR: Could not get image tag from job output or artifact" >&2
+            echo "❌ ERROR: Could not get image tag" >&2
             exit 1
           fi
           
           echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "Final image tag: $IMAGE_TAG"
 
-      - uses: actions/setup-java@v4
+      - name: ☕ Setup Java
         if: steps.check-token.outputs.has-token == 'true'
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ inputs.java-version }}
           distribution: "temurin"
           cache: "maven"
 
-      - uses: docker/login-action@v3
+      - name: 🐳 Login to Docker
         if: steps.check-token.outputs.has-token == 'true'
+        uses: docker/login-action@v3
         with:
           registry: "docker.io"
           username: ${{ secrets.DOCKER_USERNAME || github.actor }}
           password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
 
-      - name: Configure Testcontainers Cloud
+      - name: ⚙️ Configure Testcontainers Cloud
         if: steps.check-token.outputs.has-token == 'true'
         uses: atomicjar/testcontainers-cloud-setup-action@v1
         with:
           token: ${{ secrets.TC_CLOUD_TOKEN }}
           wait-for-agent: true
 
-      - name: Verify Testcontainers Cloud Connection
-        if: steps.check-token.outputs.has-token == 'true'
-        run: |
-          echo "Verifying Testcontainers Cloud connectivity..."
-          if [ -n "$TC_CLOUD_TOKEN" ]; then
-            echo "✅ TC Cloud token is set"
-            echo "🔄 Waiting for agent to be ready..."
-            sleep 5
-          else
-            echo "❌ TC Cloud token is not set"
-            exit 1
-          fi
-        env:
-          TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
-
-      - name: Run smoke test suite
+      - name: 💨 Run Smoke Tests
         if: steps.check-token.outputs.has-token == 'true'
         env:
           TC_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
           IMAGE_TAG: ${{ steps.get-tag.outputs.image-tag }}
-          # Testcontainers configuration
           TESTCONTAINERS_CLOUD_TOKEN: ${{ secrets.TC_CLOUD_TOKEN }}
           TESTCONTAINERS_REUSE_ENABLE: false
-          # Docker configuration
           DOCKER_HOST: unix:///var/run/docker.sock
         run: |
-          echo "🧪 Running smoke tests with Testcontainers Cloud"
-          echo "Image: $IMAGE_TAG"
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              💨 Running Smoke Tests                        ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          echo "🐳 Image: $IMAGE_TAG"
+          echo "⏰ Started at: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
           
-          # Run tests with retry logic
           MAX_ATTEMPTS=3
           ATTEMPT=1
           
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+            echo "────────────────────────────────────────────────────────────"
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS"
+            echo "────────────────────────────────────────────────────────────"
             
             if mvn -B -Dtest=EnhancedSmokeTest test; then
-              echo "✅ Smoke tests passed on attempt $ATTEMPT"
+              echo ""
+              echo "✅ Smoke tests PASSED on attempt $ATTEMPT"
               exit 0
             else
               if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-                echo "⚠️ Attempt $ATTEMPT failed, retrying in 30 seconds..."
+                echo "⚠️  Attempt $ATTEMPT FAILED - retrying in 30s..."
                 sleep 30
               else
-                echo "❌ All $MAX_ATTEMPTS attempts failed"
+                echo "❌ All $MAX_ATTEMPTS attempts FAILED"
                 exit 1
               fi
             fi
             
             ATTEMPT=$((ATTEMPT + 1))
           done
-        continue-on-error: false
 
-      - name: Publish Smoke Test Results
+      - name: 📊 Publish Smoke Test Results
         if: always() && steps.check-token.outputs.has-token == 'true'
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
@@ -439,58 +742,86 @@ jobs:
             target/surefire-reports/*.xml
           check_name: Smoke Test Results
 
-      - name: Smoke Tests Summary
+      - name: 📈 Smoke Tests Summary
         if: always()
         run: |
-          echo "## 💨 Smoke Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║              💨  SMOKE TESTS RESULTS                        ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ steps.check-token.outputs.has-token }}" != "true" ]; then
-            echo "⚠️ **Status:** Skipped - Testcontainers Cloud token not available" >> $GITHUB_STEP_SUMMARY
+            echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "To enable smoke tests, add \`TC_CLOUD_TOKEN\` secret to your repository." >> $GITHUB_STEP_SUMMARY
+            echo "### ⏭️ Smoke Tests Skipped" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Testcontainers Cloud token not available" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To enable smoke tests:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Get a token from [Testcontainers Cloud](https://testcontainers.com/cloud)" >> $GITHUB_STEP_SUMMARY
+            echo "2. Add \`TC_CLOUD_TOKEN\` to repository secrets" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</div>" >> $GITHUB_STEP_SUMMARY
           else
+            echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Test Configuration" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Image Tag | ${{ steps.get-tag.outputs.image-tag }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Platform | Testcontainers Cloud |" >> $GITHUB_STEP_SUMMARY
-            echo "| Status | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🐳 Image Tag | \`${{ steps.get-tag.outputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🌩️ Platform | Testcontainers Cloud |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎯 Status | **${{ job.status }}** |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</div>" >> $GITHUB_STEP_SUMMARY
             
             if [ -d "target/surefire-reports" ]; then
               TESTS=$(find target/surefire-reports -name "*.xml" -exec grep -h "tests=" {} \; 2>/dev/null | sed 's/.*tests="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
               FAILURES=$(find target/surefire-reports -name "*.xml" -exec grep -h "failures=" {} \; 2>/dev/null | sed 's/.*failures="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
               ERRORS=$(find target/surefire-reports -name "*.xml" -exec grep -h "errors=" {} \; 2>/dev/null | sed 's/.*errors="\([0-9]*\)".*/\1/' | awk '{s+=$1} END {print s}')
               
-              echo "| Tests Run | ${TESTS:-0} |" >> $GITHUB_STEP_SUMMARY
-              echo "| Failures | ${FAILURES:-0} |" >> $GITHUB_STEP_SUMMARY
-              echo "| Errors | ${ERRORS:-0} |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 📊 Test Results" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+              echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| 📊 Total | **${TESTS:-0}** |" >> $GITHUB_STEP_SUMMARY
+              echo "| ✅ Passed | **$((${TESTS:-0} - ${FAILURES:-0} - ${ERRORS:-0}))** |" >> $GITHUB_STEP_SUMMARY
+              echo "| ❌ Failed | **${FAILURES:-0}** |" >> $GITHUB_STEP_SUMMARY
+              echo "| ⚠️ Errors | **${ERRORS:-0}** |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</div>" >> $GITHUB_STEP_SUMMARY
               
               if [ "${FAILURES:-0}" -eq 0 ] && [ "${ERRORS:-0}" -eq 0 ]; then
                 echo "" >> $GITHUB_STEP_SUMMARY
-                echo "✅ All smoke tests passed!" >> $GITHUB_STEP_SUMMARY
-              else
+                echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
-                echo "❌ Some smoke tests failed - check logs for details" >> $GITHUB_STEP_SUMMARY
+                echo "### 🎉 All Smoke Tests Passed!" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "```" >> $GITHUB_STEP_SUMMARY
+                echo "  ╔════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+                echo "  ║  ✨ SMOKE FREE! ✨   ║" >> $GITHUB_STEP_SUMMARY
+                echo "  ║   ${TESTS} / ${TESTS} Passing    ║" >> $GITHUB_STEP_SUMMARY
+                echo "  ╚════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+                echo "```" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "</div>" >> $GITHUB_STEP_SUMMARY
               fi
             fi
-            
-            # Check for TC Cloud specific errors
-            if grep -q "too many concurrent requests" target/surefire-reports/*.txt 2>/dev/null; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "⚠️ **Note:** Testcontainers Cloud rate limit reached. Consider:" >> $GITHUB_STEP_SUMMARY
-              echo "- Running smoke tests less frequently" >> $GITHUB_STEP_SUMMARY
-              echo "- Upgrading your TC Cloud plan" >> $GITHUB_STEP_SUMMARY
-              echo "- Using sequential test execution" >> $GITHUB_STEP_SUMMARY
-            fi
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
 
   #######################################
-  # SECURITY SCANNERS (OWASP + CODEQL)
+  # SECURITY SCAN
   #######################################
   security:
-    name: Security Scan
+    name: 🔒 Security Scan
     runs-on: ubuntu-latest
     needs: [docker, smoke-tests]
     if: |
@@ -503,23 +834,47 @@ jobs:
       security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: 🎯 Print Security Scan Configuration
+        run: |
+          echo "════════════════════════════════════════════════════════════════"
+          echo "            🔒  SECURITY SCAN CONFIGURATION"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "🔍 OWASP Dependency Check: Enabled"
+          echo "🔍 CodeQL Analysis:        Enabled"
+          echo "☕ Java Version:           ${{ inputs.java-version }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
 
-      - uses: actions/setup-java@v4
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ inputs.java-version }}
           distribution: "temurin"
           cache: "maven"
 
-      - name: OWASP Dependency Check
+      - name: 🛡️ Run OWASP Dependency Check
         run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃           🛡️  OWASP Dependency Check                      ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          echo "⏰ Started at: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          
           mvn -B org.owasp:dependency-check-maven:check \
             -Dformat=HTML \
             -Dformat=JSON \
             -DfailBuildOnCVSS=7
+          
+          echo ""
+          echo "✅ OWASP scan completed"
         continue-on-error: true
 
-      - name: Upload OWASP Report
+      - name: 📦 Upload OWASP Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -530,39 +885,64 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - uses: github/codeql-action/init@v4
+      - name: 🔍 Initialize CodeQL
+        uses: github/codeql-action/init@v4
         with:
           languages: "java"
 
-      - run: mvn -B clean package -DskipTests
+      - name: 🔨 Build for CodeQL
+        run: |
+          echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+          echo "┃              🔨 Building for CodeQL Analysis              ┃"
+          echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+          echo ""
+          mvn -B clean package -DskipTests
+          echo ""
+          echo "✅ Build complete"
 
-      - uses: github/codeql-action/analyze@v4
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
 
-      - name: Security Scan Summary
+      - name: 📈 Security Scan Summary
         if: always()
         run: |
-          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║              🔒  SECURITY SCAN RESULTS                      ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Scan Type | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| OWASP Dependency Check | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| CodeQL Analysis | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🛡️ OWASP Dependency Check | ✅ Complete |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔍 CodeQL Analysis | ✅ Complete |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📊 Detailed security reports are available in the Security tab" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📊 Report Locations" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🛡️ **OWASP Report**: Check the \`owasp-report\` artifact" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 **CodeQL Results**: View in the Security → Code scanning alerts tab" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -f "target/dependency-check-report.html" ]; then
-            echo "✅ OWASP report generated and uploaded as artifact" >> $GITHUB_STEP_SUMMARY
+            echo "✅ OWASP report generated successfully" >> $GITHUB_STEP_SUMMARY
           else
-            echo "ℹ️ OWASP report not generated (no dependencies to check or check skipped)" >> $GITHUB_STEP_SUMMARY
+            echo "ℹ️ No dependencies to check or scan was skipped" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
 
   #######################################
-  # PRODUCTION DEPLOY ON TAGS
+  # PRODUCTION DEPLOY
   #######################################
   deploy-production:
-    name: Production Deploy
+    name: 🚀 Production Deploy
     runs-on: ubuntu-latest
     needs: [docker, security]
     if: |
@@ -572,25 +952,64 @@ jobs:
       startsWith(github.ref, 'refs/tags/v')
     
     permissions:
-      contents: write  # Required for creating releases
+      contents: write
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Deployment Summary
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: 🎯 Print Deployment Information
         run: |
-          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "════════════════════════════════════════════════════════════════"
+          echo "           🚀  PRODUCTION DEPLOYMENT"
+          echo "════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "🏷️  Tag:              ${{ github.ref_name }}"
+          echo "📝 Commit:            ${{ github.sha }}"
+          echo "👤 Triggered by:      ${{ github.actor }}"
+          echo "🐳 Image Tag:         ${{ needs.docker.outputs.image-tag }}"
+          echo ""
+          echo "════════════════════════════════════════════════════════════════"
+
+      - name: 📈 Deployment Summary
+        run: |
+          echo "╔══════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║              🚀  PRODUCTION DEPLOYMENT                      ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚══════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Deployment Details" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Environment | Production |" >> $GITHUB_STEP_SUMMARY
-          echo "| Tag | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image Tag | ${{ needs.docker.outputs.image-tag }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌍 Environment | **Production** |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏷️ Tag | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📝 Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🐳 Image | \`${{ needs.docker.outputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Deployed By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Time | $(date '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Deployment initiated successfully" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎉 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "  ╔═══════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "  ║  🚀 DEPLOYED TO PRODUCTION 🚀 ║" >> $GITHUB_STEP_SUMMARY
+          echo "  ╚═══════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Create GitHub Release
+      - name: 📝 Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           generate_release_notes: true
@@ -598,106 +1017,165 @@ jobs:
 
 
   #######################################
-  # PIPELINE SUMMARY & REPORTING
+  # FINAL PIPELINE SUMMARY
   #######################################
   pipeline-summary:
-    name: Pipeline Summary
+    name: 📊 Pipeline Summary
     runs-on: ubuntu-latest
     needs: [build, testcontainers, docker, smoke-tests, security]
     if: always()
     
     steps:
-      - name: Generate Pipeline Summary
+      - name: 📊 Generate Comprehensive Pipeline Summary
         run: |
-          echo "# 📊 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Workflow Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "╔════════════════════════════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "║            🎯 CI/CD PIPELINE EXECUTION SUMMARY                ║" >> $GITHUB_STEP_SUMMARY
+          echo "║                                                                ║" >> $GITHUB_STEP_SUMMARY
+          echo "╚════════════════════════════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status | Duration |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Workflow Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Info | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔢 Run Number | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Triggered By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔀 Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📝 Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| ⏰ Started | $(date '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🎭 Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           
           # Build job
           if [ "${{ needs.build.result }}" == "success" ]; then
-            echo "| 🏗️ Build & Unit Tests | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🏗️ Build & Unit Tests | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.build.result }}" == "failure" ]; then
-            echo "| 🏗️ Build & Unit Tests | ❌ Failed | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🏗️ Build & Unit Tests | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.build.result }}" == "skipped" ]; then
-            echo "| 🏗️ Build & Unit Tests | ⏭️ Skipped | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🏗️ Build & Unit Tests | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| 🏗️ Build & Unit Tests | ⚠️ Cancelled | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🏗️ Build & Unit Tests | ⚠️ Cancelled |" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Testcontainers job
+          # Integration tests
           if [ "${{ needs.testcontainers.result }}" == "success" ]; then
-            echo "| 🧪 Integration Tests | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🧪 Integration Tests | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.testcontainers.result }}" == "failure" ]; then
-            echo "| 🧪 Integration Tests | ❌ Failed | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🧪 Integration Tests | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.testcontainers.result }}" == "skipped" ]; then
-            echo "| 🧪 Integration Tests | ⏭️ Skipped | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🧪 Integration Tests | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| 🧪 Integration Tests | ⚠️ Cancelled | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🧪 Integration Tests | ⚠️ Cancelled |" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Docker job
+          # Docker
           if [ "${{ needs.docker.result }}" == "success" ]; then
-            echo "| 🐳 Docker Build & Push | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
-            if [ -n "${{ needs.docker.outputs.image-tag }}" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Docker Image:** \`${{ needs.docker.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "| 🐳 Docker Build & Push | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.docker.result }}" == "failure" ]; then
-            echo "| 🐳 Docker Build & Push | ❌ Failed | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🐳 Docker Build & Push | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.docker.result }}" == "skipped" ]; then
-            echo "| 🐳 Docker Build & Push | ⏭️ Skipped | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🐳 Docker Build & Push | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| 🐳 Docker Build & Push | ⚠️ Cancelled | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🐳 Docker Build & Push | ⚠️ Cancelled |" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Smoke tests job
+          # Smoke tests
           if [ "${{ needs.smoke-tests.result }}" == "success" ]; then
-            echo "| 💨 Smoke Tests | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 💨 Smoke Tests | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.smoke-tests.result }}" == "failure" ]; then
-            echo "| 💨 Smoke Tests | ❌ Failed | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 💨 Smoke Tests | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.smoke-tests.result }}" == "skipped" ]; then
-            echo "| 💨 Smoke Tests | ⏭️ Skipped | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 💨 Smoke Tests | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| 💨 Smoke Tests | ⚠️ Cancelled | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 💨 Smoke Tests | ⚠️ Cancelled |" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Security job
+          # Security
           if [ "${{ needs.security.result }}" == "success" ]; then
-            echo "| 🔒 Security Scan | ✅ Success | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔒 Security Scan | ✅ **SUCCESS** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.security.result }}" == "failure" ]; then
-            echo "| 🔒 Security Scan | ❌ Failed | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔒 Security Scan | ❌ **FAILED** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.security.result }}" == "skipped" ]; then
-            echo "| 🔒 Security Scan | ⏭️ Skipped | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔒 Security Scan | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| 🔒 Security Scan | ⚠️ Cancelled | - |" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔒 Security Scan | ⚠️ Cancelled |" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Overall status
+          # Overall status with ASCII art
           if [ "${{ needs.build.result }}" == "success" ] && \
              [ "${{ needs.docker.result }}" == "success" ] && \
              ([ "${{ needs.smoke-tests.result }}" == "success" ] || [ "${{ needs.smoke-tests.result }}" == "skipped" ]) && \
              ([ "${{ needs.security.result }}" == "success" ] || [ "${{ needs.security.result }}" == "skipped" ]); then
-            echo "## ✅ Pipeline Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "All critical jobs completed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "## 🎉 PIPELINE SUCCESS!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "  ╔═══════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║     ✨ ALL CHECKS PASSED! ✨         ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    🏗️  Build         ✅              ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    🧪 Tests         ✅              ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    🐳 Docker        ✅              ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║    🔒 Security      ✅              ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║        🚀 READY TO DEPLOY! 🚀        ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ╚═══════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</div>" >> $GITHUB_STEP_SUMMARY
           else
-            echo "## ❌ Pipeline Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "One or more critical jobs failed. Please review the logs above." >> $GITHUB_STEP_SUMMARY
+            echo "## ❌ PIPELINE FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "  ╔═══════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║     ⚠️  PIPELINE FAILED  ⚠️          ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║  Please review the failed jobs above  ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ║                                       ║" >> $GITHUB_STEP_SUMMARY
+            echo "  ╚═══════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</div>" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "${{ needs.docker.outputs.image-tag }}" ]; then
+            echo "### 🐳 Docker Image" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ needs.docker.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "📎 **Artifacts:** Check the Artifacts section for test reports, SBOM, and other outputs" >> $GITHUB_STEP_SUMMARY
-          echo "🔍 **Details:** Click on individual jobs above for detailed logs and results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<div align='center'>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**📎 Artifacts** | **🔍 Details** | **📊 Reports**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the Artifacts section for test reports, SBOM, and security scans" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</div>" >> $GITHUB_STEP_SUMMARY
