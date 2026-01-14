@@ -272,13 +272,14 @@ jobs:
             echo "✅ Initial release changelog created"
           fi
           
-          # ✅ FIX: Use unique delimiter to avoid conflicts with commit messages
-          # Using timestamp ensures the delimiter won't appear in any commit message
+          # ✅ FIX: Ensure newline before closing delimiter
+          # The git log format doesn't add a trailing newline, so we must add one
           DELIMITER="CHANGELOG_END_$(date +%s%N)"
           
           {
             echo "changelog<<${DELIMITER}"
             cat changelog.txt
+            echo ""  # ✅ CRITICAL: Ensure newline before closing delimiter
             echo "${DELIMITER}"
           } >> $GITHUB_OUTPUT
           
