@@ -740,7 +740,7 @@ jobs:
           
           # ✅ Ryuk configuration (cleanup container)
           TESTCONTAINERS_RYUK_DISABLED: false
-          TESTCONTAINERS_RYUK_CONTAINER_TIMEOUT: 60s
+          TESTCONTAINERS_RYUK_CONTAINER_TIMEOUT: 60
           TESTCONTAINERS_RYUK_CONTAINER_PRIVILEGED: false
           
           # ✅ Image pull configuration
